@@ -1,0 +1,90 @@
+diff --git a/scripts/stateless_perf.sh b/scripts/stateless_perf.sh
+index 73cc37cf..2204192a 100755
+--- a/scripts/stateless_perf.sh
++++ b/scripts/stateless_perf.sh
+@@ -14,11 +14,11 @@ pushd $traces_dir
+ if [ $metrics == x86 ]; then
+       echo Generating instruction traces
+ 
+-      parallel "grep \"|\" {} > \$(basename {} .tracelog).instructions" ::: *.tracelog
++      parallel --citation "grep \"|\" {} > \$(basename {} .tracelog).instructions" ::: *.tracelog
+ 
+       echo Generating relevant instruction traces 
+ 
+-      parallel "$py_scripts_dir/process_trace.sh {} \$(basename {} .instructions).packet_relevant_instructions \$(basename {} .instructions).tracelog \$(basename {} .instructions).packet_relevant_tracelog $verif_arg" ::: *.instructions
++      parallel --citation "$py_scripts_dir/process_trace.sh {} \$(basename {} .instructions).packet_relevant_instructions \$(basename {} .instructions).tracelog \$(basename {} .instructions).packet_relevant_tracelog $verif_arg" ::: *.instructions
+ 
+       if [ "$verif_arg" == "verify-dpdk" ]; then
+       stub_file=$py_scripts_dir/fn_lists/dpdk_fns.txt
+@@ -28,21 +28,21 @@ if [ $metrics == x86 ]; then
+ 
+       echo Generating demarcated instruction traces 
+ 
+-      parallel "python3 $py_scripts_dir/demarcate_trace.py {} \$(basename {} .packet_relevant_instructions).packet.demarcated \$(basename {} .packet_relevant_instructions).packet_relevant_tracelog \$(basename {} .packet_relevant_instructions).tracelog.demarcated  $py_scripts_dir/fn_lists/stateful_fns.txt $stub_file  $py_scripts_dir/fn_lists/time_fns.txt $py_scripts_dir/fn_lists/verif_fns.txt" ::: *.packet_relevant_instructions 
++      parallel --citation "python3 $py_scripts_dir/demarcate_trace.py {} \$(basename {} .packet_relevant_instructions).packet.demarcated \$(basename {} .packet_relevant_instructions).packet_relevant_tracelog \$(basename {} .packet_relevant_instructions).tracelog.demarcated  $py_scripts_dir/fn_lists/stateful_fns.txt $stub_file  $py_scripts_dir/fn_lists/time_fns.txt $py_scripts_dir/fn_lists/verif_fns.txt" ::: *.packet_relevant_instructions 
+ 
+       echo Cleaning up instruction traces to allow path comparison
+ 
+-      parallel "python3 $py_scripts_dir/cleanup-instr-trace.py {} \$(basename {} .packet.demarcated).packet.comparison.trace" ::: *.packet.demarcated 
++      parallel --citation "python3 $py_scripts_dir/cleanup-instr-trace.py {} \$(basename {} .packet.demarcated).packet.comparison.trace" ::: *.packet.demarcated 
+ 
+       echo Generating instruction trace so that we can analyze i-cache footprint
+ 
+-      parallel "python3 $py_scripts_dir/extract-instr-trace.py {} \$(basename {} .packet.demarcated).packet.instruction.trace" ::: *.packet.demarcated 
++      parallel --citation "python3 $py_scripts_dir/extract-instr-trace.py {} \$(basename {} .packet.demarcated).packet.instruction.trace" ::: *.packet.demarcated 
+       python3 $py_scripts_dir/instr-footprint.py ./ insns-footprint.txt
+ 
+       echo Generating address traces
+ 
+       touch concrete-state-log.txt # The stateful code should do this, but this is in case one wants to use only the stateless code (e.g., hyperkernel)
+-      parallel "python3 $py_scripts_dir/print_addresses.py {} \$(basename {} .packet.demarcated).tracelog.demarcated concrete-state-log.txt \$(basename {} .packet.demarcated).packet.unclassified_mem_trace \$(basename {} .packet.demarcated).packet.duplicated" ::: *.packet.demarcated
++      parallel --citation "python3 $py_scripts_dir/print_addresses.py {} \$(basename {} .packet.demarcated).tracelog.demarcated concrete-state-log.txt \$(basename {} .packet.demarcated).packet.unclassified_mem_trace \$(basename {} .packet.demarcated).packet.duplicated" ::: *.packet.demarcated
+ 
+       echo Checking new hypothesis
+       touch common_stateless_cache_remnants
+@@ -50,7 +50,7 @@ if [ $metrics == x86 ]; then
+ 
+       echo Classifiying address traces 
+ 
+-      parallel "python $py_scripts_dir/formal_cache.py {} \$(basename {} .packet.unclassified_mem_trace).packet.classified_mem_trace common_stateless_cache_remnants" ::: *.packet.unclassified_mem_trace
++      parallel --citation "python $py_scripts_dir/formal_cache.py {} \$(basename {} .packet.unclassified_mem_trace).packet.classified_mem_trace common_stateless_cache_remnants" ::: *.packet.unclassified_mem_trace
+ 
+       echo Putting it together 
+       python3 $py_scripts_dir/stateless_stats.py ./ comp_insns num_accesses num_hits num_misses trace_nos
+@@ -61,7 +61,7 @@ if [ $metrics == x86 ]; then
+ else
+ 
+       #traces_dir needs to contain files with the name *.ll.demarcated
+-      parallel "python3 $py_scripts_dir/stateless_perf_llvm.py {} \$(basename {} .ll.demarcated).llvm_metrics" ::: *.ll.demarcated
++      parallel --citation "python3 $py_scripts_dir/stateless_perf_llvm.py {} \$(basename {} .ll.demarcated).llvm_metrics" ::: *.ll.demarcated
+       python3 $py_scripts_dir/llvm_perf.py ./ $output
+ 
+       # #Combine llvm metrics with x86_metrics
+@@ -71,4 +71,4 @@ fi
+ ## Setup bpf-calls file independent of metric
+ python3 $py_scripts_dir/count_bpf_calls.py ./ bpf-calls.txt
+ 
+-popd
+\ No newline at end of file
++popd
+diff --git a/scripts/stitch-traces.sh b/scripts/stitch-traces.sh
+index a4cec62d..063fefd2 100755
+--- a/scripts/stitch-traces.sh
++++ b/scripts/stitch-traces.sh
+@@ -20,14 +20,14 @@ function stitch_traces {
+ 
+     touch $TRACES_DIR/stateful-error-log   
+     rm $TRACES_DIR/stateful-error-log
+-    parallel --joblog joblog.txt -j$(nproc) --halt-on-error 0 "set -euo pipefail; $SCRIPT_DIR/../build/bin/stitch-perf-contract \
++    parallel --citation --joblog joblog.txt -j$(nproc) --halt-on-error 0 "set -euo pipefail; $SCRIPT_DIR/../build/bin/stitch-perf-contract \
+                   -contract $SCRIPT_DIR/../../bolt/perf-contracts/perf-contracts.so \
+                   --user-vars \"$USER_VAR_STR\" \
+                   {} 2>> $TRACES_DIR/stateful-error-log \
+                 | awk \"{ print \\\"\$(basename {} .call_path),\\\" \\\$0; }\"" \
+                 ::: $TRACES_DIR/*.call_path > $TRACES_DIR/stateful-analysis-log.txt
+   else
+-    parallel --joblog joblog.txt -j$(nproc) --halt-on-error 0 "set -euo pipefail; $SCRIPT_DIR/../build/bin/stitch-perf-contract \
++    parallel --citation --joblog joblog.txt -j$(nproc) --halt-on-error 0 "set -euo pipefail; $SCRIPT_DIR/../build/bin/stitch-perf-contract \
+                   -contract $SCRIPT_DIR/../../bolt/perf-contracts/perf-contracts.so \
+                   {} 2>> $TRACES_DIR/stateful-error-log \
+                 | awk \"{ print \\\"\$(basename {} .call_path),\\\" \\\$0; }\"" \

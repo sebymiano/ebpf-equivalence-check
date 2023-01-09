@@ -22,6 +22,9 @@ PIN_RELEASE='3.16-98275-ge0db48c31'
 Z3_RELEASE='z3-4.5.0'
 OCAML_RELEASE='4.06.0'
 
+MAX_CPU_CORES="$(getconf _NPROCESSORS_ONLN)"
+let MAX_CPU_CORES_DIV=MAX_CPU_CORES/2
+
 ## Utility functions
 
 # Stop script if we do not have root access
@@ -212,11 +215,17 @@ source_install_dpdk()
 		patch -p1 < "$VNDSDIR/install/replay.dpdk.patch"
 
 		# Compile
-		make config T=x86_64-native-linuxapp-gcc
-		make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
+		meson build
+		cd build
+		ninja
+		DESTDIR=. ninja install
+		ldconfig
+		
+		# make config T=x86_64-native-linuxapp-gcc
+		# make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
 
 		#Small hack for compilation of parse_fns required for NF only verif. 
-		cp x86_64-native-linuxapp-gcc/include/rte_string_fns.h lib/librte_cmdline/
+		cp usr/local/include/rte_string_fns.h lib/librte_cmdline/
 
 		echo "$DPDK_RELEASE" > .version
 	fi
@@ -310,7 +319,7 @@ source_install_llvm()
 		[ -f "Makefile" ] || \
 			CXXFLAGS="-D_GLIBCXX_USE_CXX11_ABI=0" \
 			cmake ../
-		make -j30
+		make -j$MAX_CPU_CORES_DIV
 	fi
 }
 
@@ -496,17 +505,24 @@ package_sync
 # Common dependencies
 package_install \
 	build-essential \
+	ca-certificates \
 	curl \
 	git \
 	libgoogle-perftools-dev \
 	python2.7 \
 	python3-minimal \
+	python3-pyelftools \
+	python3-setuptools \
 	python3-pip \
 	parallel \
+	wget \
+	xz-utils \
 	gcc-multilib \
 	graphviz \
 	libnuma-dev \
 	cmake
+
+pip3 install meson ninja --user
 
 # Clean things
 [ -n "$CLEAN_DPDK" ]        && clean_dpdk

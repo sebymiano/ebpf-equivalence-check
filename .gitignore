@@ -43,3 +43,4 @@ klee-last
 _build
 tags
 .vscode
+tests/
