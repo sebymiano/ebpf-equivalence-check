@@ -1,3 +1,12 @@
 [submodule "bpf-equivalence-check/libbpf"]
 	path = bpf-equivalence-check/libbpf
 	url = https://github.com/libbpf/libbpf.git
+[submodule "bpf-equivalence-check/argparse"]
+	path = bpf-equivalence-check/argparse
+	url = https://github.com/cofyc/argparse.git
+[submodule "bpf-equivalence-check/log.c"]
+	path = bpf-equivalence-check/liblog
+	url = https://github.com/rxi/log.c.git
+[submodule "bpf-equivalence-check/bpftool"]
+	path = bpf-equivalence-check/bpftool
+	url = https://github.com/libbpf/bpftool.git
