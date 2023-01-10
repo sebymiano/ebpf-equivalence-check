@@ -25,7 +25,7 @@ CFLAGS := -g -Wall -DLOG_USE_COLOR
 ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS)
 
 APPS = bpf_run_test
-# HELPERS_OBJ = conntrack_if_helper.o
+HELPERS_OBJ = ktest.o
 
 # CONNTRACK_CONFIG_DEPS = libnl-3.0
 # CONNTRACK_PKG_CFLAGS := $(shell $(PKG_CONFIG) --cflags $(CONNTRACK_CONFIG_DEPS))
@@ -131,7 +131,7 @@ $(OUTPUT)/$(HELPERS_OBJ): | $(OUTPUT)
 	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $(patsubst $(OUTPUT)/%.o,%.c,$@) -o $@
 
 # Build application binary
-$(APPS): %: $(OUTPUT)/%.o $(LIBBPF_OBJ) $(LIBARGPARSE_OBJ) $(LIBLOG_OBJ) | $(OUTPUT)
+$(APPS): %: $(OUTPUT)/%.o $(OUTPUT)/$(HELPERS_OBJ) $(LIBBPF_OBJ) $(LIBARGPARSE_OBJ) $(LIBLOG_OBJ) | $(OUTPUT)
 	$(call msg,BINARY,$@)
 	$(Q)$(CC) $(CFLAGS) $^ $(ALL_LDFLAGS) -lelf -lz -o $@
 

@@ -15,6 +15,7 @@
 #include <net/if.h>
 
 #include "log.h"
+#include "ktest.h"
 
 static const char *const usages[] = {
     "bpf_run_test [options] [[--] args]",
@@ -33,6 +34,7 @@ int main(int argc, const char **argv) {
     __u8 *buf;
     __u32 *offset;
     int err, prog_fd;
+    KTest* input;
 
     struct argparse_option options[] = {
         OPT_HELP(),
@@ -73,6 +75,15 @@ int main(int argc, const char **argv) {
 		return 1;
 
 	prog_fd = bpf_program__fd(prog);
+
+    input = kTest_fromFile(ktest_file);
+    if (!input) {
+        log_error("ERROR: input file %s not valid.\n", ktest_file);
+        exit(1);
+    }
+
+    log_debug("Input file %s loaded.\n", ktest_file);
+    log_debug("Now it is time to start parsing the KLEE Ktest file");
 
 	buf = malloc(128);
 	if (!buf)
