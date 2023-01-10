@@ -2,7 +2,7 @@
 	path = bpf-equivalence-check/libbpf
 	url = https://github.com/libbpf/libbpf.git
 [submodule "bpf-equivalence-check/argparse"]
-	path = bpf-equivalence-check/argparse
+	path = bpf-equivalence-check/libargparse
 	url = https://github.com/cofyc/argparse.git
 [submodule "bpf-equivalence-check/log.c"]
 	path = bpf-equivalence-check/liblog
