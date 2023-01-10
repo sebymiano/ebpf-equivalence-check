@@ -8,6 +8,8 @@
 #include <linux/ipv6.h>
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf_helpers.h>
+#include <stdlib.h>
+#include <stdint.h>
 
 #include "../common/parsing_helpers.h"
 #include "../common/debug_tags.h"
@@ -45,22 +47,36 @@ static inline void biflow(struct flow_ctx_table_key *flow_key){
 
 }
 
-struct bpf_map_def SEC("maps") tx_port = {
-	.type = BPF_MAP_TYPE_DEVMAP,
-	.key_size = sizeof(int),
-	.value_size = sizeof(int),
-	.max_entries = 10,
-};
+struct {
+    __uint(type, BPF_MAP_TYPE_DEVMAP);
+    __type(key, int);
+    __type(value, int);
+    __uint(max_entries, 10);
+} tx_port SEC(".maps");
 
-struct bpf_map_def SEC("maps") flow_ctx_table = {
-	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(struct flow_ctx_table_key),
-	.value_size = sizeof(struct flow_ctx_table_leaf),
-	.max_entries = 1024,
-};
+// struct bpf_map_def SEC("maps") tx_port = {
+// 	.type = BPF_MAP_TYPE_DEVMAP,
+// 	.key_size = sizeof(int),
+// 	.value_size = sizeof(int),
+// 	.max_entries = 10,
+// };
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __type(key, struct flow_ctx_table_key);
+    __type(value, struct flow_ctx_table_leaf);
+    __uint(max_entries, 1024);
+} flow_ctx_table SEC(".maps");
+
+// struct bpf_map_def SEC("maps") flow_ctx_table = {
+// 	.type = BPF_MAP_TYPE_HASH,
+// 	.key_size = sizeof(struct flow_ctx_table_key),
+// 	.value_size = sizeof(struct flow_ctx_table_leaf),
+// 	.max_entries = 1024,
+// };
 
 
-SEC("xdp_fw")
+SEC("xdp")
 int xdp_fw_prog(struct xdp_md *ctx)
 {
 	

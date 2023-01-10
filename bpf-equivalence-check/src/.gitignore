@@ -1,2 +1,3 @@
 .output/
 bpf_run_test
+compile_commands.json

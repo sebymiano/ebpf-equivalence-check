@@ -53,7 +53,7 @@ int main(int argc, char** argv){
   test.data = (long)(&(pkt->ether));
   test.data_end = (long)(pkt + 1);
   test.data_meta = 0;
-  __u32 temp;
+  __u32 temp = 0;
   klee_make_symbolic(&(temp), sizeof(temp), "VIGOR_DEVICE");
   test.ingress_ifindex = temp;
   test.rx_queue_index = 0;

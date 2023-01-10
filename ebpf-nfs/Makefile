@@ -1,5 +1,6 @@
 ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 LIBBPF_DIR:=$(ROOT_DIR)/../libbpf-stubbed/src
+LIBBPF_ORIGINAL_DIR:=$(ROOT_DIR)/../../bpf-equivalence-check/libbpf/src
 COMMON_DIR:=$(ROOT_DIR)/../common
 PIX_DIR:= $(ROOT_DIR)/../..
 
@@ -9,9 +10,11 @@ CC := gcc
 UNAME_P := $(shell uname -p)
 
 XDP_C = ${XDP_TARGETS:=.c}
+XDP_BPF = ${XDP_BPF_TARGETS:=.c}
 XDP_OBJ = ${XDP_C:.c=.o}
 
 OBJECT_LIBBPF = $(LIBBPF_DIR)/libbpf.a
+OBJECT_LIBBPF_ORIGIN = $(LIBBPF_ORIGINAL_DIR)/libbpf.a
 
 # Extend if including Makefile already added some
 COMMON_OBJS += $(COMMON_DIR)/common_params.o $(COMMON_DIR)/common_user_bpf_xdp.o
@@ -25,9 +28,12 @@ EXTRA_DEPS +=
 KERN_USER_H ?= $(wildcard common_kern_user.h)
 
 LDFLAGS ?= -L$(LIBBPF_DIR)
+LDFLAGS_ORIGIN ?= -L$(LIBBPF_ORIGINAL_DIR)
 
 BPF_CFLAGS ?= -I$(LIBBPF_DIR)/build/usr/include/ -I../headers/ -I $(KLEE_INCLUDE)
+BPF_CFLAGS_ORIGIN ?= -I$(LIBBPF_ORIGINAL_DIR)/build/usr/include/ -I../headers/
 BPF_CFLAGS += -I /usr/include/$(UNAME_P)-linux-gnu
+BPF_CFLAGS_ORIGIN += -I /usr/include/$(UNAME_P)-linux-gnu
 
 ifeq ($(REPLAY), 1)
 	BPF_CFLAGS += -DREPLAY
@@ -83,22 +89,26 @@ xdp-target-runtest: $(XDP_C) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
 		-L/klee/build/lib/ \
 	    -O2 -o ${XDP_C:.c=.bin} $(XDP_C) -lkleeRuntest
 
-xdp-target-origin: $(XDP_C) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
+xdp-target-origin: $(XDP_BPF) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
+	cp ${XDP_BPF:.c=.h} $(XDP_BPF)
 	$(CLANG) \
 	    -D __BPF_TRACING__ \
-	    $(BPF_CFLAGS) \
-	    -I $(KLEE_INCLUDE) \
+	    $(BPF_CFLAGS_ORIGIN) \
 	    -Wall \
 	    -Wno-unused-value \
 	    -Wno-pointer-sign \
 	    -Wno-compare-distinct-pointer-types \
 	    -Werror \
 	    -fno-builtin \
-	    -O2 -emit-llvm -c -g $(XDP_C)
-	$(LLC) ${XDP_C:.c=.bc} -march=bpf -filetype=obj -o ${XDP_C:.c=.bpf.o}
+	    -O2 -emit-llvm -c -g $(XDP_BPF)
+	$(LLC) ${XDP_BPF:.c=.bc} -march=bpf -filetype=obj -o ${XDP_BPF:.c=.bpf.o}
+	rm $(XDP_BPF)
 
 libbpf:
 	cd $(LIBBPF_DIR) && bash build.sh
+
+libbpf-origin:
+	cd $(LIBBPF_ORIGINAL_DIR) && rm -rf obj build && mkdir obj build && BUILD_STATIC_ONLY=y OBJDIR=obj DESTDIR=build make install
 
 symbex:
 	/usr/bin/time -v \
@@ -116,7 +126,7 @@ build-tests: clean libbpf xdp-target symbex
 
 build-replay-tests: clean libbpf xdp-target-runtest
 
-build-original: clean libbpf xdp-target-origin
+build-original: clean libbpf-origin xdp-target-origin
 
 perf-interface: clean libbpf xdp-target symbex helper-contracts perf-contract
 	bash $(KLEE_INCLUDE)/../scripts/tree-gen/build_trees.sh -m 1000 -n 0 -e llvm

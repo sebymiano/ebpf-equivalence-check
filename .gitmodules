@@ -1,6 +1,7 @@
 [submodule "bpf-equivalence-check/libbpf"]
 	path = bpf-equivalence-check/libbpf
 	url = https://github.com/libbpf/libbpf.git
+	ignore = untracked
 [submodule "bpf-equivalence-check/argparse"]
 	path = bpf-equivalence-check/libargparse
 	url = https://github.com/cofyc/argparse.git

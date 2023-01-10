@@ -3,4 +3,5 @@
 include ../Makefile
 
 XDP_TARGETS := katran
+XDP_BPF_TARGETS := balancer_kern
 XDP_FUNCTION := balancer_ingress

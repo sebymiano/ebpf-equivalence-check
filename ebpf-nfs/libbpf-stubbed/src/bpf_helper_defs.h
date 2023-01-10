@@ -124,7 +124,10 @@ void bpf_map_reset_stub(struct bpf_map_def* map) {
 #define BPF_MAP_INIT(x,y,z,w)
 #define BPF_MAP_OF_MAPS_INIT(x,y,z,w,v)
 
-void bpf_begin(){}
+#define klee_make_symbolic(...) (0)
+#define klee_int(...) (0)
+#define bpf_begin(...) (0)
+
 #endif
 
 /*
