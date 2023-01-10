@@ -59,7 +59,8 @@ int main(int argc, char** argv){
   test.rx_queue_index = 0;
   
   bpf_begin();
-  if (xdp_fw_prog(&test))
-    return 1;
-  return 0;
+  // if (xdp_fw_prog(&test))
+  //   return 1;
+  // return 0;
+  return xdp_fw_prog(&test);
 }

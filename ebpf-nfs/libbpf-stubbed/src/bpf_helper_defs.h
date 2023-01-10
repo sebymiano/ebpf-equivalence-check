@@ -121,8 +121,10 @@ void bpf_map_reset_stub(struct bpf_map_def* map) {
 #define BPF_MAP_OF_MAPS_INIT(x,y,z,w,v) bpf_map_of_maps_init_stub(x,y,z,w,v)
 #define BPF_MAP_RESET(x) bpf_map_reset_stub(x)
 #else
-#define BPF_MAP_INIT(x,y,z)
-#define BPF_MAP_OF_MAPS_INIT(x,y,z,w)
+#define BPF_MAP_INIT(x,y,z,w)
+#define BPF_MAP_OF_MAPS_INIT(x,y,z,w,v)
+
+void bpf_begin(){}
 #endif
 
 /*
@@ -135,7 +137,7 @@ void bpf_map_reset_stub(struct bpf_map_def* map) {
  * 	found.
  */
 
-#ifdef USES_BPF_MAP_LOOKUP_ELEM
+#if (defined USES_BPF_MAP_LOOKUP_ELEM) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) void *bpf_map_lookup_elem(void *map, const void *key) {
   if(record_calls){
     klee_trace_ret_just_ptr(sizeof(void*));
@@ -178,8 +180,7 @@ static void *(*bpf_map_lookup_elem)(void *map, const void *key) = (void *)1;
  * Returns
  * 	0 on success, or a negative error in case of failure.
  */
-
-#ifdef USES_BPF_MAP_UPDATE_ELEM
+#if (defined USES_BPF_MAP_UPDATE_ELEM) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) long bpf_map_update_elem(void *map, const void *key, const void *value,
                                 __u64 flags) {
   if(record_calls){
@@ -237,7 +238,7 @@ static long (*bpf_probe_read)(void *dst, __u32 size,
  * 	Current *ktime*.
  */
 
-#ifdef USES_BPF_KTIME_GET_NS
+#if (defined USES_BPF_KTIME_GET_NS) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) __u64 bpf_ktime_get_ns(void) {
   if(record_calls){
     klee_trace_ret();
@@ -344,7 +345,7 @@ static __u32 (*bpf_get_prandom_u32)(void) = (void *)7;
  * 	The SMP id of the processor running the program.
  */
 
-#ifdef USES_BPF_GET_SMP_PROC_ID
+#if (defined USES_BPF_GET_SMP_PROC_ID) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) __u32 bpf_get_smp_processor_id(void){
   if(record_calls){
     klee_trace_ret();
@@ -953,7 +954,7 @@ static long (*bpf_get_stackid)(void *ctx, void *map, __u64 flags) = (void *)27;
  * 	failure.
  */
 
-#ifdef USES_BPF_CSUM_DIFF
+#if (defined USES_BPF_CSUM_DIFF) && (defined KLEE_VERIFICATION)
 
 static __attribute__ ((noinline)) __s64 bpf_csum_diff(__be32 *from, __u32 from_size, __be32 *to,
                            __u32 to_size, __wsum seed) {
@@ -1315,7 +1316,7 @@ static long (*bpf_skb_change_head)(struct __sk_buff *skb, __u32 len,
  * 	0 on success, or a negative error in case of failure.
  */
 
-#ifdef USES_BPF_XDP_ADJUST_HEAD
+#if (defined USES_BPF_XDP_ADJUST_HEAD) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) int bpf_xdp_adjust_head(struct xdp_md *xdp_md, int delta) {
   /* Simple stub for now that only moves data pointer without a check. We assume
    * programs don't use the metadata for now */
@@ -1501,7 +1502,7 @@ static long (*bpf_skb_adjust_room)(struct __sk_buff *skb, __s32 len_diff,
  * 	of the *flags* argument on error.
  */
 
-#ifdef USES_BPF_REDIRECT_MAP
+#if (defined USES_BPF_REDIRECT_MAP) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) long bpf_redirect_map (void *map, __u32 key, __u64 flags){
   if(record_calls){
     klee_trace_ret();

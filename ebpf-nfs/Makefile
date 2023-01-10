@@ -38,7 +38,7 @@ clean:
 	$(MAKE) -C $(LIBBPF_DIR) clean
 	$(MAKE) -C $(COMMON_DIR) clean
 	rm -f $(XDP_OBJ)
-	rm -f *.ll *.bc
+	rm -f *.ll *.bc *.o *.bin
 	rm -f *~
 
 clean-klee:
@@ -69,6 +69,34 @@ xdp-target: $(XDP_C) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
 	    -O2 -emit-llvm -c -g $(XDP_C)
 	# $(LLC) -march=bpf -filetype=obj -o $@ ${@:.o=.ll}
 
+xdp-target-runtest: $(XDP_C) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
+	$(CLANG) \
+	    -D __BPF_TRACING__ -DKLEE_VERIFICATION -DREPLAY \
+	    $(BPF_CFLAGS) \
+	    -I $(KLEE_INCLUDE) \
+	    -Wall \
+	    -Wno-unused-value \
+	    -Wno-pointer-sign \
+	    -Wno-compare-distinct-pointer-types \
+	    -Werror \
+	    -fno-builtin \
+		-L/klee/build/lib/ \
+	    -O2 -o ${XDP_C:.c=.bin} $(XDP_C) -lkleeRuntest
+
+xdp-target-origin: $(XDP_C) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
+	$(CLANG) \
+	    -D __BPF_TRACING__ \
+	    $(BPF_CFLAGS) \
+	    -I $(KLEE_INCLUDE) \
+	    -Wall \
+	    -Wno-unused-value \
+	    -Wno-pointer-sign \
+	    -Wno-compare-distinct-pointer-types \
+	    -Werror \
+	    -fno-builtin \
+	    -O2 -emit-llvm -c -g $(XDP_C)
+	$(LLC) ${XDP_C:.c=.bc} -march=bpf -filetype=obj -o ${XDP_C:.c=.bpf.o}
+
 libbpf:
 	cd $(LIBBPF_DIR) && bash build.sh
 
@@ -85,6 +113,10 @@ perf-contract:
 	cd klee-last && $(KLEE_INCLUDE)/../scripts/process-traces.sh . verify-dpdk llvm Num_bucket_traversals 1 Num_hash_collisions 0  expired_flows 0
 
 build-tests: clean libbpf xdp-target symbex
+
+build-replay-tests: clean libbpf xdp-target-runtest
+
+build-original: clean libbpf xdp-target-origin
 
 perf-interface: clean libbpf xdp-target symbex helper-contracts perf-contract
 	bash $(KLEE_INCLUDE)/../scripts/tree-gen/build_trees.sh -m 1000 -n 0 -e llvm

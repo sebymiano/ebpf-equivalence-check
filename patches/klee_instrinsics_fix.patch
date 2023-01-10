@@ -1,0 +1,18 @@
+diff --git a/runtime/Runtest/intrinsics.c b/runtime/Runtest/intrinsics.c
+index 5641ed26..a684245e 100644
+--- a/runtime/Runtest/intrinsics.c
++++ b/runtime/Runtest/intrinsics.c
+@@ -135,9 +135,10 @@ void klee_make_symbolic(void *array, size_t nbytes, const char *name) {
+         continue;
+       }
+       if (strcmp(name, o->name) != 0) {
+-        report_internal_error(
+-            "object name mismatch. Requesting \"%s\" but returning \"%s\"\n",
+-            name, o->name);
++        continue;
++        // report_internal_error(
++        //     "object name mismatch. Requesting \"%s\" but returning \"%s\"\n",
++        //     name, o->name);
+       }
+       memcpy(array, o->bytes, nbytes < o->numBytes ? nbytes : o->numBytes);
+       if (nbytes != o->numBytes) {

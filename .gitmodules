@@ -1,0 +1,3 @@
+[submodule "bpf-equivalence-check/libbpf"]
+	path = bpf-equivalence-check/libbpf
+	url = https://github.com/libbpf/libbpf.git
