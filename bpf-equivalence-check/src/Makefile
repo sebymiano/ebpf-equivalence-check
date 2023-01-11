@@ -13,16 +13,20 @@ LIBARGPARSE_OBJ := $(abspath ../libargparse/libargparse.a)
 LIBLOG_OBJ := $(abspath $(OUTPUT)/liblog.o)
 LIBLOG_SRC := $(abspath ../liblog/src/log.c)
 LIBLOG_HDR := $(abspath ../liblog/src/)
+LIBJSON_SRC := $(abspath ../libjson)
+LIBJSON_OBJ := $(abspath $(OUTPUT)/libjson/lib/libjson-c.a)
+LIBJSON_HDR := $(abspath $(OUTPUT)/libjson/include/)
 BPFTOOL_OUTPUT ?= $(abspath $(OUTPUT)/bpftool)
+LIBJSON_OUTPUT ?= $(abspath $(OUTPUT)/libjson)
 BPFTOOL ?= $(BPFTOOL_OUTPUT)/bootstrap/bpftool
 ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' | sed 's/ppc64le/powerpc/' | sed 's/mips.*/mips/')
 # Use our own libbpf API headers and Linux UAPI headers distributed with
 # libbpf to avoid dependency on system-wide headers, which could be missing or
 # outdated
 # INCLUDES := -I$(OUTPUT) -I../libbpf/include/uapi -I$(OUTPUT)/libxdp/include -I$(LIBARGPARSE_SRC) -I$(dir $(VMLINUX))
-INCLUDES := -I$(OUTPUT) -I../libbpf/include/uapi -I$(LIBARGPARSE_SRC) -I$(LIBLOG_HDR)
+INCLUDES := -I$(OUTPUT) -I../libbpf/include/uapi -I$(LIBARGPARSE_SRC) -I$(LIBLOG_HDR) -I$(LIBJSON_HDR)
 CFLAGS := -g -Wall -DLOG_USE_COLOR
-ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS)
+ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS) 
 
 APPS = bpf_run_test
 HELPERS_OBJ = ktest.o
@@ -32,7 +36,7 @@ HELPERS_OBJ = ktest.o
 # CONNTRACK_PKG_LIBS := $(shell $(PKG_CONFIG) --static --libs $(CONNTRACK_CONFIG_DEPS))
 
 # INCLUDES += $(CONNTRACK_PKG_CFLAGS)
-ALL_LDFLAGS += -lrt -ldl -lpthread -lm $(CONNTRACK_PKG_LIBS)
+ALL_LDFLAGS += -lrt -ldl -lpthread -lm $(CONNTRACK_PKG_LIBS) -lbsd
 
 # Get Clang's default includes on this system. We'll explicitly add these dirs
 # to the includes list when compiling with `-target bpf` because otherwise some
@@ -67,7 +71,7 @@ $(call allow-override,CC,$(CROSS_COMPILE)cc)
 $(call allow-override,LD,$(CROSS_COMPILE)ld)
 
 .PHONY: all
-all: $(APPS)
+all: libbpf $(BPFTOOL) $(APPS)
 
 .PHONY: clean
 clean:
@@ -79,6 +83,9 @@ clean-app:
 	$(Q)rm -rf $(APPS)
 	$(Q)rm -rf $(OUTPUT)/*.skel.h
 	$(Q)rm -rf $(OUTPUT)/*.o
+
+libbpf: $(LIBBPF_OBJ) | $(OUTPUT)
+	$(call msg,LIBBPF,$@)
 
 $(OUTPUT) $(OUTPUT)/libbpf $(BPFTOOL_OUTPUT):
 	$(call msg,MKDIR,$@)
@@ -107,6 +114,12 @@ $(LIBLOG_OBJ):
 	$(call msg,LIBLOG,$@)
 	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $(LIBLOG_SRC) -o $@
 
+# Build libjson
+$(LIBJSON_OBJ):
+	$(call msg,LIBJSON,$@)
+	$(Q)cmake -S $(LIBJSON_SRC) -B $(LIBJSON_SRC)/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$(LIBJSON_OUTPUT) -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DHAVE_ARC4RANDOM=OFF
+	$(Q)$(MAKE) -C $(LIBJSON_SRC)/build install
+
 # Build BPF code
 # $(OUTPUT)/%.bpf.o: ebpf/%.bpf.c $(LIBBPF_OBJ) $(wildcard ebpf/%.h) | $(OUTPUT)
 # 	$(call msg,BPF,$@)
@@ -131,7 +144,7 @@ $(OUTPUT)/$(HELPERS_OBJ): | $(OUTPUT)
 	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $(patsubst $(OUTPUT)/%.o,%.c,$@) -o $@
 
 # Build application binary
-$(APPS): %: $(OUTPUT)/%.o $(OUTPUT)/$(HELPERS_OBJ) $(LIBBPF_OBJ) $(LIBARGPARSE_OBJ) $(LIBLOG_OBJ) | $(OUTPUT)
+$(APPS): %: $(OUTPUT)/%.o $(OUTPUT)/$(HELPERS_OBJ) $(LIBBPF_OBJ) $(LIBARGPARSE_OBJ) $(LIBLOG_OBJ) $(LIBJSON_OBJ) | $(OUTPUT)
 	$(call msg,BINARY,$@)
 	$(Q)$(CC) $(CFLAGS) $^ $(ALL_LDFLAGS) -lelf -lz -o $@
 

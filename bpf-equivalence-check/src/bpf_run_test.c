@@ -10,9 +10,13 @@
 #include <signal.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <libgen.h>
+#include <sys/stat.h>
+#include <dirent.h>
 
 #include <argparse.h>
 #include <net/if.h>
+#include <json-c/json.h>
 
 #include "log.h"
 #include "ktest.h"
@@ -23,25 +27,205 @@ static const char *const usages[] = {
     NULL,
 };
 
+KTestObject* get_object_by_name(KTest* input, const char* name) {
+    for (int i = 0; i < input->numObjects; i++) {
+        KTestObject* obj = &input->objects[i];
+        if (strcmp(obj->name, name) == 0) {
+            return obj;
+        }
+    }
+
+    return NULL;
+}
+
+int run_bpf_program_with_ktest_file(int prog_fd, const char* ktest_file, char *res_dir, const struct bpf_program *prog) {
+    KTest* input;
+    int err, ret, ret_code = 0;
+    char *buf, *buf_out;
+    LIBBPF_OPTS(bpf_test_run_opts, topts);
+
+    input = kTest_fromFile(ktest_file);
+    if (!input) {
+        log_error("ERROR: input file %s not valid.\n", ktest_file);
+        return -1;
+    }
+
+    log_debug("Input file %s loaded.", ktest_file);
+    log_debug("Now it is time to start parsing the KLEE Ktest file");
+
+    log_debug("The Ktest file has %d objects.", input->numObjects);
+    for (int i = 0; i < input->numObjects; i++) {
+        KTestObject* obj = &input->objects[i];
+        log_debug("Object %d has %d bytes.", i, obj->numBytes);
+        log_debug("Object %d has name %s.", i, obj->name);
+    }
+
+    KTestObject* user_buf = get_object_by_name(input, "user_buf");
+    if (!user_buf) {
+        log_error("ERROR: user_buf not found in the Ktest file.");
+        ret_code = -1;
+        goto end;
+    }
+
+    log_debug("Got the user_buf object from the Ktest file.");
+    log_debug("Allocating a buffer of size %d for the BPF program.", user_buf->numBytes);
+
+	buf = malloc(user_buf->numBytes);
+	if (!buf) {
+        log_error("ERROR: failed to allocate input buffer for BPF program.");
+        ret_code = -1;
+        goto end;
+    }
+
+    buf_out = malloc(user_buf->numBytes);
+	if (!buf) {
+        log_error("ERROR: failed to allocate output buffer for BPF program.");
+        ret_code = -1;
+        goto end;
+    }
+		
+    memcpy(buf, user_buf->bytes, user_buf->numBytes);
+    memset(buf_out, 0, user_buf->numBytes);
+
+	topts.data_in = buf;
+	topts.data_out = buf_out;
+	topts.data_size_in = user_buf->numBytes;
+	topts.data_size_out = user_buf->numBytes;
+
+    log_debug("Now it is time to start running the BPF program");
+	err = bpf_prog_test_run_opts(prog_fd, &topts);
+    if (err) {
+        log_error("Error running the BPF program: %d", err);
+        ret_code = -1;
+        goto end;
+    }
+
+    log_debug("Return code for the BPF program is: %d\n", topts.retval);
+    
+    log_debug("Let's now compare the output buffer with the expected output buffer.");
+    ret = memcmp(buf, buf_out, user_buf->numBytes);
+    if (ret != 0) {
+        log_error("ERROR: the output buffer is different from the expected output buffer.");
+        ret_code = -1;
+        goto end;
+    }
+
+    // Get filename from path
+    char *ktest_file_copy = strdup(ktest_file);
+    char *ktest_filename = basename(ktest_file_copy);
+
+    // Remove extension from filename
+    char *filename = strdup(ktest_filename);
+    free(ktest_file_copy);
+    char *dot = strrchr(filename, '.');
+    if (dot)
+        *dot = '\0';
+
+    // Add json extension to filename
+    char *json_filename = malloc(strlen(filename) + 5);
+    if (!json_filename) {
+        log_error("ERROR: failed to allocate memory for the JSON filename.");
+        free(filename);
+        ret_code = -1;
+        goto end;
+    }
+
+    strcpy(json_filename, filename);
+    strcat(json_filename, ".json");
+    free(filename);
+
+    // Create JSON file
+    json_object *root = json_object_new_object();
+    if (!root) {
+        ret_code = -1;
+        goto end;
+    }
+
+    // Add the name of the BPF program
+    json_object *prog_name = json_object_new_string(bpf_program__name(prog));
+    if (!prog_name) {
+        ret_code = -1;
+        goto end;
+    }
+    json_object_object_add(root, "prog_name", prog_name);
+
+    // Add the name of the Ktest file
+    json_object *ktest_name = json_object_new_string(ktest_file);
+    if (!ktest_name) {
+        ret_code = -1;
+        goto end;
+    }
+    json_object_object_add(root, "ktest_name", ktest_name);
+
+    // Add the return value of the BPF program
+    json_object *ret_val = json_object_new_int(topts.retval);
+    if (!ret_val) {
+        ret_code = -1;
+        goto end;
+    }
+    json_object_object_add(root, "ret_val", ret_val);
+
+    // Add the output buffer
+    json_object *output_buf = json_object_new_string_len(buf_out, user_buf->numBytes);
+    if (!output_buf) {
+        ret_code = -1;
+        goto end;
+    }
+    json_object_object_add(root, "output_buf", output_buf);
+
+    char *final_filename = malloc(strlen(res_dir) + strlen(json_filename) + 2);
+    strcpy(final_filename, res_dir);
+    strcat(final_filename, "/");
+    strcat(final_filename, json_filename);
+
+    // Create path to the JSON file
+    char *json_dir = strdup(final_filename);
+    char *json_dirname = dirname(json_dir);
+    if (access(json_dirname, F_OK) == -1) {
+        if (mkdir(json_dirname, 0777) == -1) {
+            log_error("ERROR: failed to create directory %s", json_dirname);
+            ret_code = -1;
+            goto end;
+        }
+    }
+    free(json_dir);
+
+    // Save the JSON file
+    if (json_object_to_file_ext(final_filename, root, JSON_C_TO_STRING_PRETTY)) {
+        log_error("Error: failed to save %s!!", final_filename);
+        log_error("Error: %s", json_util_get_last_err());
+    } else {
+        log_info("%s saved", final_filename);
+    }
+
+    ret_code = 0;
+
+end:
+    kTest_free(input);
+    free(buf);
+    free(buf_out);
+    free(json_filename);
+    free(final_filename);
+    return ret_code;
+}
+
 int main(int argc, const char **argv) {
     const char *bpf_file = NULL;
     const char *ktest_file = NULL;
-    const char *output_file = NULL;
+    const char *input_dir = NULL;
+    char *res_dir = NULL;
 
-    LIBBPF_OPTS(bpf_test_run_opts, topts);
     struct bpf_program *prog;
 	struct bpf_object *obj;
-    __u8 *buf;
-    __u32 *offset;
-    int err, prog_fd;
-    KTest* input;
+    int prog_fd;
 
     struct argparse_option options[] = {
         OPT_HELP(),
         OPT_GROUP("Basic options"),
         OPT_STRING('b', "bpf_file", &bpf_file, "BPF object file", NULL, 0, 0),
         OPT_STRING('k', "ktest_file", &ktest_file, "KLEE Ktest file", NULL, 0, 0),
-        OPT_STRING('o', "out_file", &output_file, "Save results into an output file", NULL, 0, 0),
+        OPT_STRING('i', "input_dir", &input_dir, "Dir with a list of KLEE Ktest files", NULL, 0, 0),
+        OPT_STRING('d', "res_dir", &res_dir, "Save results into this directory (default 'test')", NULL, 0, 0),
         OPT_END(),
     };
 
@@ -52,70 +236,67 @@ int main(int argc, const char **argv) {
 
     argc = argparse_parse(&argparse, argc, argv);
 
-    if (bpf_file == NULL || ktest_file == NULL) {
-        log_error("Please specify a BPF object file and a KLEE ktest file.");
+    if (bpf_file == NULL) {
+        log_error("Please specify a BPF object file.");
         exit(1);
     }
 
-    if (output_file == NULL) {
-        log_error("Please specify an output file.");
+    if (ktest_file == NULL && input_dir == NULL) {
+        log_error("Please specify a KLEE Ktest file or a directory with KLEE Ktest files.");
         exit(1);
+    }
+
+    if (res_dir == NULL) {
+        log_warn("Directory not specified, using 'test' as default.");
+        res_dir = malloc(5);
+        strcpy(res_dir, "test");
     }
 
     libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 
     obj = bpf_object__open(bpf_file);
 	if (libbpf_get_error(obj))
-		return 1;
+		exit(1);
 
     log_debug("BPF object opened, let's now get the program.");
 
     prog = bpf_object__next_program(obj, NULL);
 	if (bpf_object__load(obj))
-		return 1;
+		goto out;
 
 	prog_fd = bpf_program__fd(prog);
 
-    input = kTest_fromFile(ktest_file);
-    if (!input) {
-        log_error("ERROR: input file %s not valid.\n", ktest_file);
-        exit(1);
+    // Get all files from the input directory
+    if (input_dir != NULL) {
+        DIR *d;
+        struct dirent *dir;
+        d = opendir(input_dir);
+        if (d) {
+            while ((dir = readdir(d)) != NULL) {
+                if (dir->d_type == DT_REG) {
+                    if (strstr(dir->d_name, ".ktest") != NULL) {
+                        log_debug("Found Ktest file: %s", dir->d_name);
+                        char* ktest_file_in_dir = malloc(strlen(input_dir) + strlen(dir->d_name) + 2);
+                        strcpy(ktest_file_in_dir, input_dir);
+                        strcat(ktest_file_in_dir, "/");
+                        strcat(ktest_file_in_dir, dir->d_name);
+                        // Run BPF program against ktestfile
+                        run_bpf_program_with_ktest_file(prog_fd, ktest_file_in_dir, res_dir, prog);
+                        free(ktest_file_in_dir);
+                    }
+                }
+            }
+            closedir(d);
+        }
+    } else {
+        // Run BPF program against ktestfile
+        run_bpf_program_with_ktest_file(prog_fd, ktest_file, res_dir, prog);
     }
-
-    log_debug("Input file %s loaded.\n", ktest_file);
-    log_debug("Now it is time to start parsing the KLEE Ktest file");
-
-	buf = malloc(128);
-	if (!buf)
-		goto out;
-
-    memset(buf, 0, 128);
-	offset = (__u32 *)buf;
-	*offset = 16;
-	buf[*offset] = 0xaa;		/* marker at offset 16 (head) */
-	buf[*offset + 15] = 0xaa;	/* marker at offset 31 (head) */
-
-	topts.data_in = buf;
-	topts.data_out = buf;
-	topts.data_size_in = 128;
-	topts.data_size_out = 128;
-
-	err = bpf_prog_test_run_opts(prog_fd, &topts);
-    if (err) {
-        log_error("Error running the BPF program: %d", err);
-        exit(1);
-    }
-
-    log_debug("Return code for the BPF program is: %d\n", topts.retval);
-	/* test_xdp_update_frags: buf[16,31]: 0xaa -> 0xbb */
-	// ASSERT_OK(err, "xdp_update_frag");
-	// ASSERT_EQ(topts.retval, XDP_PASS, "xdp_update_frag retval");
-	// ASSERT_EQ(buf[16], 0xbb, "xdp_update_frag buf[16]");
-	// ASSERT_EQ(buf[31], 0xbb, "xdp_update_frag buf[31]");
-
-	free(buf);
 
 out:
+    if (res_dir) {
+        free(res_dir);
+    }
 	bpf_object__close(obj);
 
     return 0;

@@ -11,3 +11,6 @@
 [submodule "bpf-equivalence-check/bpftool"]
 	path = bpf-equivalence-check/bpftool
 	url = https://github.com/libbpf/bpftool.git
+[submodule "bpf-equivalence-check/json-c"]
+	path = bpf-equivalence-check/libjson
+	url = https://github.com/json-c/json-c.git
