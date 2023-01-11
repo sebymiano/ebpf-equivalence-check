@@ -42,25 +42,23 @@ int main(int argc, char** argv){
   }
   /* Init done */
 
-
   struct pkt *pkt = malloc(sizeof(struct pkt));
   klee_make_symbolic(pkt, sizeof(struct pkt), "user_buf");
-  pkt->ether.h_proto = bpf_htons(ETH_P_IP);
-  pkt->ipv4.version = 4;
-  pkt->ipv4.ihl = sizeof(struct iphdr) / 4;
-  pkt->tcp.doff = sizeof(struct tcphdr) / 4;
+  // pkt->ether.h_proto = bpf_htons(ETH_P_IP);
+  // pkt->ipv4.version = 4;
+  // pkt->ipv4.ihl = sizeof(struct iphdr) / 4;
+  // pkt->tcp.doff = sizeof(struct tcphdr) / 4;
   struct xdp_md test;
   test.data = (long)(&(pkt->ether));
   test.data_end = (long)(pkt + 1);
   test.data_meta = 0;
   __u32 temp = 0;
-  klee_make_symbolic(&(temp), sizeof(temp), "VIGOR_DEVICE");
+  klee_make_symbolic(&(temp), sizeof(temp), "ingress_ifindex");
   test.ingress_ifindex = temp;
   test.rx_queue_index = 0;
   
   bpf_begin();
-  // if (xdp_fw_prog(&test))
-  //   return 1;
-  // return 0;
-  return xdp_fw_prog(&test);
+  if (xdp_fw_prog(&test))
+    return 1;
+  return 0;
 }

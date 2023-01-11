@@ -18,7 +18,7 @@
 
 #define BE_ETH_P_IP 8
 
-//#define DEBUG 1
+// #define DEBUG 1
 #ifdef  DEBUG
 
 #define bpf_debug(fmt, ...)						\
@@ -28,7 +28,7 @@
 				##__VA_ARGS__);			\
 			})
 #else
-#define bpf_debug(fmt, ...) { } while (0)
+#define bpf_debug(fmt, ...) (0)
 #endif
 
 static inline void biflow(struct flow_ctx_table_key *flow_key){
@@ -47,6 +47,21 @@ static inline void biflow(struct flow_ctx_table_key *flow_key){
 
 }
 
+#if defined KLEE_VERIFICATION
+struct bpf_map_def SEC("maps") tx_port = {
+	.type = BPF_MAP_TYPE_DEVMAP,
+	.key_size = sizeof(int),
+	.value_size = sizeof(int),
+	.max_entries = 10,
+};
+
+struct bpf_map_def SEC("maps") flow_ctx_table = {
+	.type = BPF_MAP_TYPE_HASH,
+	.key_size = sizeof(struct flow_ctx_table_key),
+	.value_size = sizeof(struct flow_ctx_table_leaf),
+	.max_entries = 1024,
+};
+# else 
 struct {
     __uint(type, BPF_MAP_TYPE_DEVMAP);
     __type(key, int);
@@ -54,26 +69,13 @@ struct {
     __uint(max_entries, 10);
 } tx_port SEC(".maps");
 
-// struct bpf_map_def SEC("maps") tx_port = {
-// 	.type = BPF_MAP_TYPE_DEVMAP,
-// 	.key_size = sizeof(int),
-// 	.value_size = sizeof(int),
-// 	.max_entries = 10,
-// };
-
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __type(key, struct flow_ctx_table_key);
     __type(value, struct flow_ctx_table_leaf);
     __uint(max_entries, 1024);
 } flow_ctx_table SEC(".maps");
-
-// struct bpf_map_def SEC("maps") flow_ctx_table = {
-// 	.type = BPF_MAP_TYPE_HASH,
-// 	.key_size = sizeof(struct flow_ctx_table_key),
-// 	.value_size = sizeof(struct flow_ctx_table_leaf),
-// 	.max_entries = 1024,
-// };
+#endif
 
 
 SEC("xdp")
@@ -106,6 +108,8 @@ int xdp_fw_prog(struct xdp_md *ctx)
 	
 	
 	ingress_ifindex = ctx->ingress_ifindex;
+
+	bpf_debug("ingress_ifindex: %d\n", ingress_ifindex);
 	
 	bpf_debug("I'm eth\n");
 	if(ethernet->h_proto != BE_ETH_P_IP)
@@ -147,6 +151,9 @@ int xdp_fw_prog(struct xdp_md *ctx)
 
 	biflow(&flow_key);
 
+	// if (ip->saddr == 0x0a000001)
+	// 	return XDP_ABORTED;
+
 	if (ingress_ifindex == B_PORT){
 		flow_leaf = bpf_map_lookup_elem(&flow_ctx_table, &flow_key);
 			
@@ -163,6 +170,7 @@ int xdp_fw_prog(struct xdp_md *ctx)
 			bpf_map_update_elem(&flow_ctx_table, &flow_key, &new_flow, BPF_ANY);
 		}
 		
+		bpf_debug("redirecting to port %d\n", A_PORT);
 		return bpf_redirect_map(&tx_port, B_PORT, 0);
 	}
 

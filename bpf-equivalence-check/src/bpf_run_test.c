@@ -21,13 +21,16 @@
 #include "log.h"
 #include "ktest.h"
 
+#define A_PORT  6
+#define B_PORT 7
+
 static const char *const usages[] = {
     "bpf_run_test [options] [[--] args]",
     "bpf_run_test [options]",
     NULL,
 };
 
-KTestObject* get_object_by_name(KTest* input, const char* name) {
+KTestObject* get_ktest_object_by_name(KTest* input, const char* name) {
     for (int i = 0; i < input->numObjects; i++) {
         KTestObject* obj = &input->objects[i];
         if (strcmp(obj->name, name) == 0) {
@@ -38,11 +41,34 @@ KTestObject* get_object_by_name(KTest* input, const char* name) {
     return NULL;
 }
 
+int fill_maps_with_correct_values(struct bpf_object *obj) {
+    struct bpf_map *tx_port = bpf_object__find_map_by_name(obj, "tx_port");
+    if (tx_port == NULL) {
+        log_error("ERROR: tx_port map not found!");
+        return -1;
+    }
+
+    int tx_port_fd = bpf_map__fd(tx_port);
+
+    int keys[] = {B_PORT,A_PORT};
+	int values[] = {B_PORT,A_PORT};
+
+    for(int i = 0; i < sizeof(keys)/sizeof(keys[0]); i++){
+        if (bpf_map_update_elem(tx_port_fd, &keys[i], &values[i], BPF_ANY) == 0) {
+            log_debug("tx_port map updated with key %d and value %d", keys[i], values[i]);
+        } else {
+            log_error("ERROR: tx_port map not updated with key %d and value %d", keys[i], values[i]);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
 int run_bpf_program_with_ktest_file(int prog_fd, const char* ktest_file, char *res_dir, const struct bpf_program *prog) {
     KTest* input;
     int err, ret, ret_code = 0;
     char *buf, *buf_out;
-    LIBBPF_OPTS(bpf_test_run_opts, topts);
 
     input = kTest_fromFile(ktest_file);
     if (!input) {
@@ -60,7 +86,7 @@ int run_bpf_program_with_ktest_file(int prog_fd, const char* ktest_file, char *r
         log_debug("Object %d has name %s.", i, obj->name);
     }
 
-    KTestObject* user_buf = get_object_by_name(input, "user_buf");
+    KTestObject* user_buf = get_ktest_object_by_name(input, "user_buf");
     if (!user_buf) {
         log_error("ERROR: user_buf not found in the Ktest file.");
         ret_code = -1;
@@ -70,27 +96,46 @@ int run_bpf_program_with_ktest_file(int prog_fd, const char* ktest_file, char *r
     log_debug("Got the user_buf object from the Ktest file.");
     log_debug("Allocating a buffer of size %d for the BPF program.", user_buf->numBytes);
 
-	buf = malloc(user_buf->numBytes);
+	buf = malloc(user_buf->numBytes + sizeof(__u32));
 	if (!buf) {
         log_error("ERROR: failed to allocate input buffer for BPF program.");
         ret_code = -1;
         goto end;
     }
 
-    buf_out = malloc(user_buf->numBytes);
+    buf_out = malloc(user_buf->numBytes + sizeof(__u32));
 	if (!buf) {
         log_error("ERROR: failed to allocate output buffer for BPF program.");
         ret_code = -1;
         goto end;
     }
-		
-    memcpy(buf, user_buf->bytes, user_buf->numBytes);
-    memset(buf_out, 0, user_buf->numBytes);
+	
+    memcpy(buf + sizeof(__u32), user_buf->bytes, user_buf->numBytes);
+    memset(buf_out, 0, user_buf->numBytes + sizeof(__u32));
 
-	topts.data_in = buf;
-	topts.data_out = buf_out;
-	topts.data_size_in = user_buf->numBytes;
-	topts.data_size_out = user_buf->numBytes;
+    KTestObject* ingress_ifindex = get_ktest_object_by_name(input, "ingress_ifindex");
+    if (!ingress_ifindex) {
+        log_error("ERROR: ingress_ifindex not found in the Ktest file.");
+        ret_code = -1;
+        goto end;
+    }
+
+    log_debug("Got the ingress_ifindex object from the Ktest file.");
+
+    struct xdp_md ctx_in = { 
+                .data = sizeof(__u32),
+				.data_end = user_buf->numBytes + sizeof(__u32),
+                .ingress_ifindex = *(int*)ingress_ifindex->bytes
+    };
+
+    DECLARE_LIBBPF_OPTS(bpf_test_run_opts, topts,
+            .data_in = buf,
+            .data_size_in = user_buf->numBytes + sizeof(__u32),
+            .data_out = buf_out,
+            .data_size_out = user_buf->numBytes + sizeof(__u32),
+            .ctx_in = &ctx_in,
+            .ctx_size_in = sizeof(ctx_in)
+    );
 
     log_debug("Now it is time to start running the BPF program");
 	err = bpf_prog_test_run_opts(prog_fd, &topts);
@@ -103,7 +148,7 @@ int run_bpf_program_with_ktest_file(int prog_fd, const char* ktest_file, char *r
     log_debug("Return code for the BPF program is: %d\n", topts.retval);
     
     log_debug("Let's now compare the output buffer with the expected output buffer.");
-    ret = memcmp(buf, buf_out, user_buf->numBytes);
+    ret = memcmp(buf, buf_out, user_buf->numBytes + sizeof(__u32));
     if (ret != 0) {
         log_error("ERROR: the output buffer is different from the expected output buffer.");
         ret_code = -1;
@@ -166,7 +211,7 @@ int run_bpf_program_with_ktest_file(int prog_fd, const char* ktest_file, char *r
     json_object_object_add(root, "ret_val", ret_val);
 
     // Add the output buffer
-    json_object *output_buf = json_object_new_string_len(buf_out, user_buf->numBytes);
+    json_object *output_buf = json_object_new_string_len(buf_out + sizeof(__u32), user_buf->numBytes);
     if (!output_buf) {
         ret_code = -1;
         goto end;
@@ -265,6 +310,11 @@ int main(int argc, const char **argv) {
 		goto out;
 
 	prog_fd = bpf_program__fd(prog);
+
+    if (fill_maps_with_correct_values(obj) != 0) {
+        log_error("Error: failed to fill maps with correct values.");
+        goto out;
+    }
 
     // Get all files from the input directory
     if (input_dir != NULL) {

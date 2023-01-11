@@ -93,7 +93,7 @@ xdp-target-origin: $(XDP_BPF) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
 	cp ${XDP_BPF:.c=.h} $(XDP_BPF)
 	$(CLANG) \
 	    -D __BPF_TRACING__ \
-	    $(BPF_CFLAGS_ORIGIN) \
+	    $(BPF_CFLAGS_ORIGIN) -DDEBUG \
 	    -Wall \
 	    -Wno-unused-value \
 	    -Wno-pointer-sign \
