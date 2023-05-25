@@ -63,8 +63,6 @@ RUN /tmp/scripts/build_install_llvm.sh --to /llvm -i install -- \
     -DLLVM_INCLUDE_UTILS=ON \
     -DLLVM_INSTALL_UTILS=ON
 
-# FROM sebymiano/llvm-pix:latest as llvm-builder
-
 FROM ocaml/opam:ubuntu-18.04-ocaml-4.06
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -242,18 +240,13 @@ RUN cd /llvm/build/bin && rm -rf clang-check clang-tidy clangd lldb-test c-index
                            sancov obj2yaml sanstats yaml2obj lli-child-target clang-apply-replacements \
                            clang-format lldb-mi lldb-vscode
 
-# RUN cd /llvm/build/lib && rm -rf rm libLLVM* liblldb* liblld* libclangT* libclangStaticAnalyzerCheckers.a \
-#                           libLTO.so.8 libclangCodeGen.a libclangSema.a libclangAST.a libclangStaticAnalyzerCore.a \
-#                           libclangARCMigrate.a libPolly.a libclangDaemon.a libclangFrontend.a libclangParse.a \
-#                           libclangAnalysis.a libclangSerialization.a libclangDriver.a libclangDynamicASTMatchers.a \
-#                           LLVMPolly.so libclangIndex.a libclangLex.a libclangBasic.a libclangStaticAnalyzerFrontend.a \
-#                           libfindAllSymbols.a libclangDoc.a libclangRewriteFrontend.a libclangASTMatchers.a libclangFormat.a \
-#                           libclangMove.a libclangQuery.a libclangChangeNamespace.a libclangIncludeFixer.a libclangReorderFields.a
+RUN cd /llvm/build/lib && rm -rf *.a
+
 ENV LD_LIBRARY_PATH=/llvm/build/lib:$LD_LIBRARY_PATH
 
 WORKDIR /pix
 
-ADD ebpf-nfs/ /pix/ebpf-nfs
-ADD dpdk-nfs/ /pix/dpdk-nfs
+# ADD ebpf-nfs/ /pix/ebpf-nfs
+# ADD dpdk-nfs/ /pix/dpdk-nfs
 
 CMD ["/bin/bash"]

@@ -36,7 +36,7 @@ HELPERS_OBJ = ktest.o
 # CONNTRACK_PKG_LIBS := $(shell $(PKG_CONFIG) --static --libs $(CONNTRACK_CONFIG_DEPS))
 
 # INCLUDES += $(CONNTRACK_PKG_CFLAGS)
-ALL_LDFLAGS += -lrt -ldl -lpthread -lm $(CONNTRACK_PKG_LIBS) -lbsd
+ALL_LDFLAGS += -lrt -ldl -lpthread -lm $(LIBJSON_OBJ) $(CONNTRACK_PKG_LIBS) -lbsd
 
 # Get Clang's default includes on this system. We'll explicitly add these dirs
 # to the includes list when compiling with `-target bpf` because otherwise some
@@ -144,7 +144,7 @@ $(OUTPUT)/$(HELPERS_OBJ): | $(OUTPUT)
 	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $(patsubst $(OUTPUT)/%.o,%.c,$@) -o $@
 
 # Build application binary
-$(APPS): %: $(OUTPUT)/%.o $(OUTPUT)/$(HELPERS_OBJ) $(LIBBPF_OBJ) $(LIBARGPARSE_OBJ) $(LIBLOG_OBJ) $(LIBJSON_OBJ) | $(OUTPUT)
+$(APPS): %: $(LIBJSON_OBJ) $(OUTPUT)/%.o $(OUTPUT)/$(HELPERS_OBJ) $(LIBBPF_OBJ) $(LIBARGPARSE_OBJ) $(LIBLOG_OBJ) | $(OUTPUT)
 	$(call msg,BINARY,$@)
 	$(Q)$(CC) $(CFLAGS) $^ $(ALL_LDFLAGS) -lelf -lz -o $@
 
