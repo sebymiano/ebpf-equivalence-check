@@ -1,0 +1,45 @@
+FROM ubuntu:latest 
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get -qq update \
+ && apt-get -qq install --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    libnuma-dev \
+    python3-pip \
+    python3-pyelftools \
+    python3-setuptools \
+    wget \
+	curl \
+	git \
+	libgoogle-perftools-dev \
+	python2.7 \
+	python3-minimal \
+	clang \
+    llvm \
+    llvm-dev \
+    libelf-dev \
+    libpcap-dev \
+    gcc-multilib \
+    build-essential \
+    linux-headers-generic \
+    linux-tools-common \
+    linux-tools-generic \
+    tcpdump \
+    libbfd-dev \
+    libcap-dev \
+    cmake \
+    libbsd-dev \
+    libedit-dev 
+
+
+WORKDIR /equivalence
+
+RUN git clone https://github.com/sebymiano/ebpf-equivalence-check.git --recurse-submodules
+#COPY bpf-equivalence-check ebpf-equivalence-check
+
+RUN cd ebpf-equivalence-check/bpf-equivalence-check/src && \
+    make 
+
+CMD ["/bin/bash"]
