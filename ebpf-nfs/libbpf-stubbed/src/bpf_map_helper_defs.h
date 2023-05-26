@@ -76,6 +76,7 @@ struct MapStub {
   /* Map config */
   uint key_size;
   uint value_size;
+  uint lookup_num;
 };
 
 void *map_allocate(char* name, char* key_type, char* val_type, unsigned int key_size, unsigned int value_size,
@@ -95,6 +96,7 @@ void *map_allocate(char* name, char* key_type, char* val_type, unsigned int key_
   map->keys_present = calloc(max_entries, key_size);
   map->values_present = calloc(max_entries, value_size);
   klee_assert(map->keys_present && map->values_present);
+  // klee_make_symbolic(map->keys_present, max_entries*key_size, map->key_type);
   klee_make_symbolic(map->values_present, max_entries*value_size, map->val_type);
   for (int n = 0; n < NUM_ELEMS; ++n) {
     map->key_deleted[n] = 0;
@@ -103,6 +105,8 @@ void *map_allocate(char* name, char* key_type, char* val_type, unsigned int key_
     // map->keys_cached[n] = klee_int("map_keys_cached");
     map->keys_cached[n] = 0;
   }
+
+  map->lookup_num = 0;
   return map;
 }
 

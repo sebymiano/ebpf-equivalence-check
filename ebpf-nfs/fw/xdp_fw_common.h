@@ -13,14 +13,13 @@ struct flow_ctx_table_key {
 	__u16 l4_dst;
 	__u32 ip_src;
 	__u32 ip_dst;
-
 };
 
 struct flow_ctx_table_leaf {
 	__u8 out_port;
 	__u16 in_port;
 //	flow_register_t flow_reg;
-};
+} __attribute__((packed));
 
 
 #endif /* FW_H */

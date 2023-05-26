@@ -1,4 +1,4 @@
 .output/
-bpf_run_test
+equivalence_check
 compile_commands.json
 test/

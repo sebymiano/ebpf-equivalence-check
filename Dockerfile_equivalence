@@ -33,14 +33,16 @@ RUN apt-get -q update \
     libbsd-dev \
     libedit-dev 
 
+RUN apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /tmp/*
 
-WORKDIR /ebpf-equivalence
+WORKDIR /
 
 RUN git clone https://github.com/sebymiano/ebpf-equivalence-check.git --recurse-submodules
 
-RUN mv ebpf-equivalence-check/bpf-equivalence-check/* .
+RUN make -C ebpf-equivalence-check/bpf-equivalence-check/src
+RUN cp ebpf-equivalence-check/bpf-equivalence-check/src/equivalence_check /usr/bin
 RUN rm -rf ebpf-equivalence-check
 
-RUN make -C src
-
-ENTRYPOINT ["/ebpf-equivalence/src/equivalence_check"]
+ENTRYPOINT ["/usr/bin/equivalence_check"]
