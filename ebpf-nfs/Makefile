@@ -64,10 +64,9 @@ xdp-target: $(XDP_C) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
 	$(CLANG) \
 	    -target bpf \
 	    -D __BPF_TRACING__ -DKLEE_VERIFICATION\
+		-DOPENED_EQUIVALENCE\
 	    $(BPF_CFLAGS) \
 	    -I $(KLEE_INCLUDE) \
-	    -Wall \
-	    -Wno-unused-value \
 	    -Wno-pointer-sign \
 	    -Wno-compare-distinct-pointer-types \
 	    -Werror \

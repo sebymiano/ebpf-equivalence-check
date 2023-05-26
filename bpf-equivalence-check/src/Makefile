@@ -28,7 +28,7 @@ INCLUDES := -I$(OUTPUT) -I../libbpf/include/uapi -I$(LIBARGPARSE_SRC) -I$(LIBLOG
 CFLAGS := -g -Wall -DLOG_USE_COLOR
 ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS) 
 
-APPS = bpf_run_test
+APPS = equivalence_check
 HELPERS_OBJ = ktest.o
 
 # CONNTRACK_CONFIG_DEPS = libnl-3.0
