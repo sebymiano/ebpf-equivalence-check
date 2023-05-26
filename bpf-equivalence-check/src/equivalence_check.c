@@ -22,7 +22,6 @@
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/tcp.h>
-#include "xdp_fw/xdp_fw_common.h"
 
 #include <argparse.h>
 #include <net/if.h>
