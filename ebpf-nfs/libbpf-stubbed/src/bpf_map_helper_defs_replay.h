@@ -17,6 +17,7 @@ struct ArrayStub {
   char *data;
   uint value_size;
   uint capacity;
+  uint lookup_num;
 };
 
 void *array_allocate(char* name, char* data_type, unsigned int value_size, unsigned int max_entries) {
@@ -71,6 +72,7 @@ struct MapStub {
   /* Map config */
   uint key_size;
   uint value_size;
+  uint lookup_num;
 };
 
 void *map_allocate(char* name, char* key_type, char* val_type, unsigned int key_size, unsigned int value_size,

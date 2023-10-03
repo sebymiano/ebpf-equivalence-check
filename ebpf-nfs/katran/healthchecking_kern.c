@@ -21,8 +21,8 @@
 #include <linux/string.h>
 #include <linux/udp.h>
 
-#include "bpf.h"
-#include "bpf_helpers.h"
+#include <linux/bpf.h>
+#include <bpf/bpf_helpers.h>
 
 #include "encap_helpers.h"
 

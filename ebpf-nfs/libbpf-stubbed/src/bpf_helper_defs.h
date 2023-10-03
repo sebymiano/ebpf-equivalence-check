@@ -56,7 +56,7 @@ struct bpf_map_def {
 #include <string.h>
 #include <stdio.h>
 
-#define MAX_BPF_MAPS 10 // Just a random size for now
+#define MAX_BPF_MAPS 50 // Just a random size for now
 enum MapStubTypes { ArrayStub, MapStub, MapofMapStub };
 void *bpf_map_stubs[MAX_BPF_MAPS];
 enum MapStubTypes bpf_map_stub_types[MAX_BPF_MAPS];
@@ -144,67 +144,99 @@ void bpf_map_reset_stub(struct bpf_map_def* map) {
 #if (defined USES_BPF_MAP_LOOKUP_ELEM) && (defined KLEE_VERIFICATION)
 #if (defined OPENED_EQUIVALENCE)
 
-void unsigned_to_string(unsigned int num, char *str) {
-    int i = 0;
-    do {
-        str[i++] = num % 10 + '0';
-        num /= 10;
-    } while (num > 0);
-    str[i] = '\0';
+// void unsigned_to_string(unsigned int num, char *str) {
+//     int i = 0;
+//     do {
+//         str[i++] = num % 10 + '0';
+//         num /= 10;
+//     } while (num > 0);
+//     str[i] = '\0';
     
-    // Reverse the string
-    int j = i - 1;
-    i = 0;
-    while (i < j) {
-        char temp = str[i];
-        str[i] = str[j];
-        str[j] = temp;
-        i++;
-        j--;
-    }
-}
+//     // Reverse the string
+//     int j = i - 1;
+//     i = 0;
+//     while (i < j) {
+//         char temp = str[i];
+//         str[i] = str[j];
+//         str[j] = temp;
+//         i++;
+//         j--;
+//     }
+// }
 
+// static __attribute__ ((noinline)) void *bpf_map_lookup_elem(void *map, const void *key) {
+//   if(record_calls){
+//     klee_trace_ret_just_ptr(sizeof(void*));
+//     klee_add_bpf_call();
+//   }
+//   struct bpf_map_def *map_ptr = ((struct bpf_map_def *)map);
+//   TRACE_VAL((uint32_t)(map_ptr), "map", _u32)
+//   TRACE_VAR(map_ptr->type, "bpf_map_type");
+//   klee_warning("Calling right bpf_map_lookup_elem");
+
+//   struct MapStub *map_stub = bpf_map_stubs[map_ptr->map_id];
+
+//   if (bpf_map_stub_types[map_ptr->map_id] == ArrayStub)
+//     klee_warning("ArrayStub");
+//   else if (bpf_map_stub_types[map_ptr->map_id] == MapStub)
+//     klee_warning("MapStub");
+//   else if (bpf_map_stub_types[map_ptr->map_id] == MapofMapStub)
+//     klee_warning("MapofMapStub");
+//   else
+//     assert(0 && "Unsupported map type");
+
+//    /* Generating symbol name */
+//   char *sym_name = "_in_";
+//   char *underscore = "_";
+//   char lookup_num_str[20];
+//   klee_assert(map_stub != NULL);
+//   map_stub->lookup_num++;
+//   unsigned_to_string(map_stub->lookup_num, lookup_num_str);
+//   // sprintf(lookup_num_str, "%u", map_stub->lookup_num);
+//   char *final_sym_name = (char *)malloc(1 + strlen(map_stub->key_type) +
+//                                         strlen(sym_name) + strlen(map_stub->name) 
+//                                         + strlen(lookup_num_str));
+//   strcpy(final_sym_name, map_stub->key_type);
+//   strcat(final_sym_name, sym_name);
+//   strcat(final_sym_name, map_stub->name);
+//   // strcat(final_sym_name, underscore);
+//   strcat(final_sym_name, lookup_num_str);
+//   int map_has_this_key = klee_int(final_sym_name);
+
+//   if (map_has_this_key) {
+//     char *key_str = "key";
+//     char *ret_value_str = (char *)malloc(1 + strlen(key_str) + strlen(lookup_num_str));
+//     strcpy(ret_value_str, key_str);
+//     strcat(ret_value_str, lookup_num_str);
+
+//     void *ret_value = malloc(map_stub->value_size);
+//   	klee_make_symbolic(ret_value, map_stub->value_size, ret_value_str);
+
+//     klee_warning("Create and return value for key");
+//     // klee_make_symbolic(ret_value, map_stub->value_size, "val");
+
+//     return ret_value;
+//   } else {
+//     return NULL;
+//   }
+// }
 static __attribute__ ((noinline)) void *bpf_map_lookup_elem(void *map, const void *key) {
   if(record_calls){
     klee_trace_ret_just_ptr(sizeof(void*));
     klee_add_bpf_call();
   }
+
   struct bpf_map_def *map_ptr = ((struct bpf_map_def *)map);
   TRACE_VAL((uint32_t)(map_ptr), "map", _u32)
   TRACE_VAR(map_ptr->type, "bpf_map_type");
-
-  struct MapStub *map_stub = bpf_map_stubs[map_ptr->map_id];
-   /* Generating symbol name */
-  char *sym_name = "_in_";
-  char *underscore = "_";
-  char lookup_num_str[20];
-  map_stub->lookup_num++;
-  unsigned_to_string(map_stub->lookup_num, lookup_num_str);
-  // sprintf(lookup_num_str, "%u", map_stub->lookup_num);
-  char *final_sym_name = (char *)malloc(1 + strlen(map_stub->key_type) +
-                                        strlen(sym_name) + strlen(map_stub->name) 
-                                        + strlen(lookup_num_str));
-  strcpy(final_sym_name, map_stub->key_type);
-  strcat(final_sym_name, sym_name);
-  strcat(final_sym_name, map_stub->name);
-  // strcat(final_sym_name, underscore);
-  strcat(final_sym_name, lookup_num_str);
-  int map_has_this_key = klee_int(final_sym_name);
-
-  if (map_has_this_key) {
-    char *key_str = "key";
-    char *ret_value_str = (char *)malloc(1 + strlen(key_str) + strlen(lookup_num_str));
-    strcpy(ret_value_str, key_str);
-    strcat(ret_value_str, lookup_num_str);
-
-    void *ret_value = malloc(map_stub->value_size);
-  	klee_make_symbolic(ret_value, map_stub->value_size, ret_value_str);
-    // klee_make_symbolic(ret_value, map_stub->value_size, "val");
-
-    return ret_value;
-  } else {
-    return NULL;
-  }
+  if (bpf_map_stub_types[map_ptr->map_id] == ArrayStub)
+    return array_lookup_elem(bpf_map_stubs[map_ptr->map_id], key);
+  else if (bpf_map_stub_types[map_ptr->map_id] == MapStub)
+    return map_lookup_elem(bpf_map_stubs[map_ptr->map_id], key);
+  else if (bpf_map_stub_types[map_ptr->map_id] == MapofMapStub)
+    return map_of_map_lookup_elem(bpf_map_stubs[map_ptr->map_id], key);
+  else
+    assert(0 && "Unsupported map type");
 }
 #else
 static __attribute__ ((noinline)) void *bpf_map_lookup_elem(void *map, const void *key) {
@@ -212,6 +244,8 @@ static __attribute__ ((noinline)) void *bpf_map_lookup_elem(void *map, const voi
     klee_trace_ret_just_ptr(sizeof(void*));
     klee_add_bpf_call();
   }
+
+  klee_warning("Calling wrong bpf_map_lookup_elem");
   struct bpf_map_def *map_ptr = ((struct bpf_map_def *)map);
   TRACE_VAL((uint32_t)(map_ptr), "map", _u32)
   TRACE_VAR(map_ptr->type, "bpf_map_type");

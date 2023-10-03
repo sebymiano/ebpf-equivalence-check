@@ -14,8 +14,8 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include "bpf.h"
-#include "bpf_helpers.h"
+#include <linux/bpf.h>
+#include <bpf/bpf_helpers.h>
 
 #define ROOT_ARRAY_SIZE 3
 

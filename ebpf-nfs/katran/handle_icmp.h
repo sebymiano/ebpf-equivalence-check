@@ -32,8 +32,8 @@
 #include "balancer_consts.h"
 #include "balancer_structs.h"
 #include "balancer_helpers.h"
-#include "bpf.h"
-#include "bpf_endian.h"
+#include <linux/bpf.h>
+#include <bpf/bpf_endian.h>
 
 __attribute__((__always_inline__))
 static inline int swap_mac_and_send(void *data, void *data_end) {

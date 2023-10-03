@@ -21,8 +21,8 @@
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 
-#include "bpf.h"
-#include "bpf_helpers.h"
+#include <linux/bpf.h>
+#include <bpf/bpf_helpers.h>
 
 __attribute__((__always_inline__))
 static inline __u16 csum_fold_helper(__u64 csum) {
@@ -77,8 +77,8 @@ static inline void ipv6_csum(void *data_start, int data_size,
                              __u64 *csum, struct ipv6hdr *ip6h) {
   // ipv6 pseudo header
   __u32 tmp = 0;
-  *csum = bpf_csum_diff(0, 0, &ip6h->saddr, sizeof(struct in6_addr), *csum);
-  *csum = bpf_csum_diff(0, 0, &ip6h->daddr, sizeof(struct in6_addr), *csum);
+  *csum = bpf_csum_diff(0, 0, (__be32*)&ip6h->saddr, sizeof(struct in6_addr), *csum);
+  *csum = bpf_csum_diff(0, 0, (__be32*)&ip6h->daddr, sizeof(struct in6_addr), *csum);
   tmp = __builtin_bswap32((__u32)(data_size));
   *csum = bpf_csum_diff(0, 0, &tmp, sizeof(__u32), *csum);
   tmp = __builtin_bswap32((__u32)(ip6h->nexthdr));

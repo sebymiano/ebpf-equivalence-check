@@ -21,6 +21,7 @@ struct ArrayStub {
   char *data;
   uint value_size;
   uint capacity;
+  uint lookup_num;
 };
 
 void *array_allocate(char* name, char* data_type, unsigned int value_size, unsigned int max_entries) {
@@ -34,14 +35,49 @@ void *array_allocate(char* name, char* data_type, unsigned int value_size, unsig
   klee_assert(array->data);
   array->capacity = max_entries;
   array->value_size = value_size;
+  array->lookup_num = 0;
   return array;
+}
+
+void unsigned_to_string(unsigned int num, char *str) {
+    int i = 0;
+    do {
+        str[i++] = num % 10 + '0';
+        num /= 10;
+    } while (num > 0);
+    str[i] = '\0';
+    
+    // Reverse the string
+    int j = i - 1;
+    i = 0;
+    while (i < j) {
+        char temp = str[i];
+        str[i] = str[j];
+        str[j] = temp;
+        i++;
+        j--;
+    }
 }
 
 void *array_lookup_elem(struct ArrayStub *array, const void *key) {
   uint index = *(uint *)key;
   klee_assume(index < array->capacity);
   void *val_ptr = array->data + index * array->value_size;
-  return val_ptr;
+
+  klee_warning("Calling right bpf_map_lookup_elem for ARRAY");
+
+  char lookup_num_str[20];
+  array->lookup_num++;
+  unsigned_to_string(array->lookup_num, lookup_num_str);
+
+  char *key_str = "val";
+  char *ret_value_str = (char *)malloc(1 + strlen(key_str) + strlen(lookup_num_str));
+  strcpy(ret_value_str, key_str);
+  strcat(ret_value_str, lookup_num_str);
+
+  void *ret_value = malloc(array->value_size);
+  klee_make_symbolic(ret_value, array->value_size, ret_value_str);
+  return ret_value;
 }
 
 long array_update_elem(struct ArrayStub *array, const void *key,
@@ -125,14 +161,22 @@ void *map_lookup_elem(struct MapStub *map, const void *key) {
     }
   }
   klee_assert(map->keys_seen < NUM_ELEMS && "No space left in the map stub");
+
+  klee_warning("Calling right bpf_map_lookup_elem for HASH");
   
   /* Generating symbol name */
   char *sym_name = "_in_";
+  char lookup_num_str[20];
+  map->lookup_num++;
+
+  unsigned_to_string(map->lookup_num, lookup_num_str);
   char *final_sym_name = (char *)malloc(1 + strlen(map->key_type) +
-                                        strlen(sym_name) + strlen(map->name));
+                                        strlen(sym_name) + strlen(map->name) +
+                                        strlen(lookup_num_str));
   strcpy(final_sym_name, map->key_type);
   strcat(final_sym_name, sym_name);
   strcat(final_sym_name, map->name);
+  strcat(final_sym_name, lookup_num_str);
   int map_has_this_key = klee_int(final_sym_name);
 
   void *key_ptr = map->keys_present + map->keys_seen * map->key_size;
@@ -142,7 +186,16 @@ void *map_lookup_elem(struct MapStub *map, const void *key) {
   if (map_has_this_key) {
     map->key_deleted[map->keys_seen] = 0;
     map->keys_seen++;
-    return val_ptr;
+
+    char *key_str = "val";
+    char *ret_value_str = (char *)malloc(1 + strlen(key_str) + strlen(lookup_num_str));
+    strcpy(ret_value_str, key_str);
+    strcat(ret_value_str, lookup_num_str);
+
+    void *ret_value = malloc(map->value_size);
+    klee_make_symbolic(ret_value, map->value_size, ret_value_str);
+
+    return ret_value;
   } else {
     map->key_deleted[map->keys_seen] = 1;
     map->keys_seen++;

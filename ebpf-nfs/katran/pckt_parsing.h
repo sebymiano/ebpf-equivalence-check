@@ -35,7 +35,7 @@
 
 #include "balancer_consts.h"
 #include "balancer_helpers.h"
-#include "bpf.h"
+#include <linux/bpf.h>
 
 struct quic_long_header {
   __u8 flags;

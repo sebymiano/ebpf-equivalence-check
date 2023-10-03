@@ -22,8 +22,8 @@
  * involving information pertaining to proper forwarding of packets
  */
 
-#include "bpf.h"
-#include "bpf_helpers.h"
+#include <linux/bpf.h>
+#include <bpf/bpf_helpers.h>
 
 #include "balancer_consts.h"
 #include "balancer_structs.h"
@@ -37,8 +37,9 @@ struct bpf_map_def SEC("maps") vip_map = {
   .map_flags = NO_FLAGS,
   .map_id = -1,
 };
+#ifndef OPENED_EQUIVALENCE
 BPF_ANNOTATE_KV_PAIR(vip_map, struct vip_definition, struct vip_meta);
-
+#endif
 
 // map which contains cpu core to lru mapping
 struct bpf_map_def SEC("maps") lru_mapping = {
@@ -59,7 +60,11 @@ struct bpf_map_def SEC("maps") fallback_cache = {
   .map_flags = NO_FLAGS,
   .map_id = -1,
 };
+
+#ifndef OPENED_EQUIVALENCE
 BPF_ANNOTATE_KV_PAIR(fallback_cache, struct flow_key, struct real_pos_lru);
+#endif
+
 
 // map which contains all vip to real id mappings
 struct bpf_map_def SEC("maps") ch_rings = {
@@ -70,7 +75,10 @@ struct bpf_map_def SEC("maps") ch_rings = {
   .map_flags = NO_FLAGS,
   .map_id = -1,
 };
+#ifndef OPENED_EQUIVALENCE
 BPF_ANNOTATE_KV_PAIR(ch_rings, __u32, __u32);
+#endif
+
 
 // map which contains opaque real's id to real definition mapping
 struct bpf_map_def SEC("maps") reals = {
@@ -81,7 +89,9 @@ struct bpf_map_def SEC("maps") reals = {
   .map_flags = NO_FLAGS,
   .map_id = -1,
 };
+#ifndef OPENED_EQUIVALENCE
 BPF_ANNOTATE_KV_PAIR(reals, __u32, struct real_definition);
+#endif
 
 // map with per real pps/bps statistic
 struct bpf_map_def SEC("maps") reals_stats = {
@@ -92,7 +102,10 @@ struct bpf_map_def SEC("maps") reals_stats = {
   .map_flags = NO_FLAGS,
   .map_id = -1,
 };
+#ifndef OPENED_EQUIVALENCE
 BPF_ANNOTATE_KV_PAIR(reals_stats, __u32, struct lb_stats);
+#endif
+
 
 // map w/ per vip statistics
 struct bpf_map_def SEC("maps") stats = {
@@ -103,7 +116,10 @@ struct bpf_map_def SEC("maps") stats = {
   .map_flags = NO_FLAGS,
   .map_id = -1,
 };
+#ifndef OPENED_EQUIVALENCE
 BPF_ANNOTATE_KV_PAIR(stats, __u32, struct lb_stats);
+#endif
+
 
 // map for quic connection-id to real's id mapping
 struct bpf_map_def SEC("maps") quic_mapping = {
@@ -114,7 +130,10 @@ struct bpf_map_def SEC("maps") quic_mapping = {
   .map_flags = NO_FLAGS,
   .map_id = -1,
 };
+#ifndef OPENED_EQUIVALENCE
 BPF_ANNOTATE_KV_PAIR(quic_mapping, __u32, __u32);
+#endif
+
 
 #ifdef LPM_SRC_LOOKUP
 struct bpf_map_def SEC("maps") lpm_src_v4 = {
@@ -125,7 +144,10 @@ struct bpf_map_def SEC("maps") lpm_src_v4 = {
   .map_flags = BPF_F_NO_PREALLOC,
   .map_id = -1,
 };
+#ifndef OPENED_EQUIVALENCE
 BPF_ANNOTATE_KV_PAIR(lpm_src_v4, struct v4_lpm_key, __u32);
+#endif
+
 
 struct bpf_map_def SEC("maps") lpm_src_v6 = {
   .type = BPF_MAP_TYPE_LPM_TRIE,
@@ -135,7 +157,10 @@ struct bpf_map_def SEC("maps") lpm_src_v6 = {
   .map_flags = BPF_F_NO_PREALLOC,
   .map_id = -1,
 };
+#ifndef OPENED_EQUIVALENCE
 BPF_ANNOTATE_KV_PAIR(lpm_src_v6, struct v6_lpm_key, __u32);
+#endif
+
 
 #endif
 

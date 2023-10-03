@@ -26,6 +26,10 @@
 #define USES_BPF_XDP_ADJUST_HEAD
 #endif
 
+#ifndef USES_BPF_CSUM_DIFF
+#define USES_BPF_CSUM_DIFF
+#endif
+
 #include "katran_pkts.h"
 
 int main(int argc, char** argv){

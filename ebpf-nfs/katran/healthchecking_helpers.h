@@ -25,8 +25,8 @@
 #include <linux/udp.h>
 #include <stdbool.h>
 
-#include "bpf.h"
-#include "bpf_helpers.h"
+#include <linux/bpf.h>
+#include <bpf/bpf_helpers.h>
 
 #include "encap_helpers.h"
 

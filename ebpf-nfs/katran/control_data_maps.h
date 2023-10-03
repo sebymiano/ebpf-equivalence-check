@@ -22,8 +22,8 @@
  * information about encapsulation / decapsulation
  */
 
-#include "bpf.h"
-#include "bpf_helpers.h"
+#include <linux/bpf.h>
+#include <bpf/bpf_helpers.h>
 
 #include "balancer_consts.h"
 #include "balancer_structs.h"
@@ -40,7 +40,9 @@ struct bpf_map_def SEC("maps") ctl_array = {
   .map_flags = NO_FLAGS,
   .map_id = -1,
 };
+#ifndef OPENED_EQUIVALENCE
 BPF_ANNOTATE_KV_PAIR(ctl_array, __u32, struct ctl_value);
+#endif
 
 #ifdef KATRAN_INTROSPECTION
 
@@ -51,7 +53,9 @@ struct bpf_map_def SEC("maps") event_pipe = {
     .max_entries = MAX_SUPPORTED_CPUS,
     .map_flags = NO_FLAGS,
 };
+#ifndef OPENED_EQUIVALENCE
 BPF_ANNOTATE_KV_PAIR(event_pipe, int, __u32);
+#endif
 
 #endif
 
@@ -63,7 +67,9 @@ struct bpf_map_def SEC("maps") decap_dst = {
     .max_entries = MAX_VIPS,
     .map_flags = NO_FLAGS,
 };
+#ifndef OPENED_EQUIVALENCE
 BPF_ANNOTATE_KV_PAIR(decap_dst, struct address, __u32);
+#endif
 
 struct bpf_map_def SEC("maps") subprograms = {
     .type = BPF_MAP_TYPE_PROG_ARRAY,
@@ -71,7 +77,10 @@ struct bpf_map_def SEC("maps") subprograms = {
     .value_size = sizeof(__u32),
     .max_entries = SUBPROGRAMS_ARRAY_SIZE,
 };
+#ifndef OPENED_EQUIVALENCE
 BPF_ANNOTATE_KV_PAIR(subprograms, __u32, __u32);
+#endif
+
 #endif
 
 #ifdef GUE_ENCAP
@@ -85,7 +94,10 @@ struct bpf_map_def SEC("maps") pckt_srcs = {
     .max_entries = 2,
     .map_flags = NO_FLAGS,
 };
+#ifndef OPENED_EQUIVALENCE
 BPF_ANNOTATE_KV_PAIR(pckt_srcs, __u32, struct real_definition);
+#endif
+
 #endif
 
 #endif // of __CONTROL_DATA_MAPS_H

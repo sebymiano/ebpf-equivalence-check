@@ -28,8 +28,8 @@
 #include "balancer_consts.h"
 #include "balancer_structs.h"
 #include "control_data_maps.h"
-#include "bpf.h"
-#include "bpf_helpers.h"
+#include <linux/bpf.h>
+#include <bpf/bpf_helpers.h>
 #include "csum_helpers.h"
 #include "introspection.h"
 

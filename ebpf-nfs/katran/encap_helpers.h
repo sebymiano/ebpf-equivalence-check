@@ -23,9 +23,9 @@
 #include <string.h>
 
 #include "balancer_consts.h"
-#include "bpf.h"
-#include "bpf_endian.h"
-#include "bpf_helpers.h"
+#include <linux/bpf.h>
+#include <bpf/bpf_endian.h>
+#include <bpf/bpf_helpers.h>
 #include "csum_helpers.h"
 
 __attribute__((__always_inline__)) static inline void create_v4_hdr(
