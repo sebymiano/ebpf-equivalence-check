@@ -77,6 +77,7 @@ xdp-target: $(XDP_C) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
 xdp-target-runtest: $(XDP_C) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
 	$(CLANG) \
 	    -D __BPF_TRACING__ -DKLEE_VERIFICATION -DREPLAY \
+		-DOPENED_EQUIVALENCE\
 	    $(BPF_CFLAGS) \
 	    -I $(KLEE_INCLUDE) \
 	    -Wall \
@@ -111,7 +112,7 @@ libbpf-origin:
 
 symbex:
 	/usr/bin/time -v \
-		klee -allocate-determ -allocate-determ-start-address=0x00040000000 -allocate-determ-size=1000 -libc=uclibc --external-calls=none --disable-verify \
+		klee -allocate-determ -allocate-determ-start-address=0x00040000000 -allocate-determ-size=1000 -libc=uclibc --external-calls=concrete --disable-verify \
 		-dump-call-traces -dump-call-trace-instructions -call-trace-instr-startfn=$(XDP_FUNCTION) -call-trace-instr-endfn=$(XDP_FUNCTION) -dump-constraint-tree \
 		-solver-backend=z3 -exit-on-error -max-memory=750000 -search=dfs -condone-undeclared-havocs $(XDP_TARGETS).bc
 

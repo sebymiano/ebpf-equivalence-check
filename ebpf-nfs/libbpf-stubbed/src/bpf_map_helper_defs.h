@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #define NUM_ELEMS 4
 /* This is a totally random 32 bit number used as a hack to check if the key used to lookup maps 
@@ -64,15 +65,18 @@ void *array_lookup_elem(struct ArrayStub *array, const void *key) {
   klee_assume(index < array->capacity);
   void *val_ptr = array->data + index * array->value_size;
 
-  klee_warning("Calling right bpf_map_lookup_elem for ARRAY");
+  // klee_warning("Calling right bpf_map_lookup_elem for ARRAY");
 
   char lookup_num_str[20];
   array->lookup_num++;
   unsigned_to_string(array->lookup_num, lookup_num_str);
 
-  char *key_str = "val";
-  char *ret_value_str = (char *)malloc(1 + strlen(key_str) + strlen(lookup_num_str));
-  strcpy(ret_value_str, key_str);
+  char *val_str = "val_";
+  char *ret_value_str = (char *)malloc(1 + strlen(array->name) + 1 + strlen(val_str) + 1 + strlen(lookup_num_str));
+  strcpy(ret_value_str, array->name);
+  strcat(ret_value_str, "_");
+  strcat(ret_value_str, val_str);
+  // strcat(ret_value_str, "_");
   strcat(ret_value_str, lookup_num_str);
 
   void *ret_value = malloc(array->value_size);
@@ -147,22 +151,22 @@ void *map_allocate(char* name, char* key_type, char* val_type, unsigned int key_
 }
 
 void *map_lookup_elem(struct MapStub *map, const void *key) {
-  for (int n = 0; n < map->keys_seen; ++n) {
-    void *key_ptr = map->keys_present + n * map->key_size;
-    if (memcmp(key_ptr, key, map->key_size)) {
-      if (map->key_deleted[n])
-        return NULL;
-      else {
-        void *val_ptr = map->values_present + n * map->value_size;
-        if (!(map->keys_cached[n]))
-          map->keys_cached[n] = 1;
-        return val_ptr;
-      }
-    }
-  }
-  klee_assert(map->keys_seen < NUM_ELEMS && "No space left in the map stub");
+  // for (int n = 0; n < map->keys_seen; ++n) {
+  //   void *key_ptr = map->keys_present + n * map->key_size;
+  //   if (memcmp(key_ptr, key, map->key_size)) {
+  //     if (map->key_deleted[n])
+  //       return NULL;
+  //     else {
+  //       void *val_ptr = map->values_present + n * map->value_size;
+  //       if (!(map->keys_cached[n]))
+  //         map->keys_cached[n] = 1;
+  //       return val_ptr;
+  //     }
+  //   }
+  // }
+  // klee_assert(map->keys_seen < NUM_ELEMS && "No space left in the map stub");
 
-  klee_warning("Calling right bpf_map_lookup_elem for HASH");
+  // klee_warning("Calling right bpf_map_lookup_elem for HASH");
   
   /* Generating symbol name */
   char *sym_name = "_in_";
@@ -187,9 +191,12 @@ void *map_lookup_elem(struct MapStub *map, const void *key) {
     map->key_deleted[map->keys_seen] = 0;
     map->keys_seen++;
 
-    char *key_str = "val";
-    char *ret_value_str = (char *)malloc(1 + strlen(key_str) + strlen(lookup_num_str));
-    strcpy(ret_value_str, key_str);
+    char *val_str = "val_";
+    char *ret_value_str = (char *)malloc(1 + strlen(map->name) + 1 + strlen(val_str) + 1 + strlen(lookup_num_str));
+    strcpy(ret_value_str, map->name);
+    strcat(ret_value_str, "_");
+    strcat(ret_value_str, val_str);
+    // strcat(ret_value_str, "_");
     strcat(ret_value_str, lookup_num_str);
 
     void *ret_value = malloc(map->value_size);

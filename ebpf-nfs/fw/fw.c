@@ -18,9 +18,9 @@
 #define USES_BPF_REDIRECT_MAP
 #endif
 
-#ifndef USES_BPF_CSUM_DIFF
-#define USES_BPF_CSUM_DIFF
-#endif
+// #ifndef USES_BPF_CSUM_DIFF
+// #define USES_BPF_CSUM_DIFF
+// #endif
 
 #include "xdp_fw_kern.h"
 

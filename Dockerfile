@@ -242,7 +242,7 @@ RUN cd /llvm/build/bin && rm -rf clang-check clang-tidy clangd lldb-test c-index
 
 RUN cd /llvm/build/lib && rm -rf *.a
 
-ENV LD_LIBRARY_PATH=/llvm/build/lib:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH=/llvm/build/lib:/klee/build/lib/:$LD_LIBRARY_PATH
 
 WORKDIR /pix
 

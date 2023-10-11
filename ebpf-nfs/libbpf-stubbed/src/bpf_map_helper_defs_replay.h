@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #define NUM_ELEMS 4
 
@@ -18,6 +19,7 @@ struct ArrayStub {
   uint value_size;
   uint capacity;
   uint lookup_num;
+  uint key_size;
 };
 
 void *array_allocate(char* name, char* data_type, unsigned int value_size, unsigned int max_entries) {
@@ -31,13 +33,54 @@ void *array_allocate(char* name, char* data_type, unsigned int value_size, unsig
   assert(array->data);
   array->capacity = max_entries;
   array->value_size = value_size;
+  array->key_size = sizeof(int);
   return array;
+}
+
+void unsigned_to_string(unsigned int num, char *str) {
+    int i = 0;
+    do {
+        str[i++] = num % 10 + '0';
+        num /= 10;
+    } while (num > 0);
+    str[i] = '\0';
+    
+    // Reverse the string
+    int j = i - 1;
+    i = 0;
+    while (i < j) {
+        char temp = str[i];
+        str[i] = str[j];
+        str[j] = temp;
+        i++;
+        j--;
+    }
 }
 
 void *array_lookup_elem(struct ArrayStub *array, const void *key) {
   uint index = *(uint *)key;
   assert(index < array->capacity);
   void *val_ptr = array->data + index * array->value_size;
+
+  char lookup_num_str[20];
+  array->lookup_num++;
+  unsigned_to_string(array->lookup_num, lookup_num_str);
+
+  char *key_str = "key_";
+  char *ret_value_str = (char *)malloc(1 + strlen(array->name) + 1 + strlen(key_str) + 1 + strlen(lookup_num_str));
+  strcpy(ret_value_str, array->name);
+  strcat(ret_value_str, "_");
+  strcat(ret_value_str, key_str);
+  strcat(ret_value_str, lookup_num_str);
+
+  printf("Value for key: %s\n", ret_value_str);
+  printf("0x");
+  char *key_char_ptr = (char *)key;
+  for (int i = 0; i < array->key_size; i++) {
+    printf("%02x", *(key_char_ptr + i));
+  }
+  printf("\n");
+
   return val_ptr;
 }
 
@@ -100,6 +143,26 @@ void *map_allocate(char* name, char* key_type, char* val_type, unsigned int key_
 }
 
 void *map_lookup_elem(struct MapStub *map, const void *key) {
+  char lookup_num_str[20];
+  map->lookup_num++;
+  unsigned_to_string(map->lookup_num, lookup_num_str);
+
+  char *key_str = "key_";
+  char *ret_value_str = (char *)malloc(1 + strlen(map->name) + 1 + strlen(key_str) + 1 + strlen(lookup_num_str));
+  strcpy(ret_value_str, map->name);
+  strcat(ret_value_str, "_");
+  strcat(ret_value_str, key_str);
+  strcat(ret_value_str, lookup_num_str);
+
+  printf("Value for key: %s\n", ret_value_str);
+
+  char *key_char_ptr = (char *)key;
+  printf("0x");
+  for (int i = 0; i < map->key_size; i++) {
+    printf("%02x", *(key_char_ptr + i));
+  }
+  printf("\n");
+
   for (int n = 0; n < map->keys_seen; ++n) {
     void *key_ptr = map->keys_present + n * map->key_size;
     if (memcmp(key_ptr, key, map->key_size)) {
