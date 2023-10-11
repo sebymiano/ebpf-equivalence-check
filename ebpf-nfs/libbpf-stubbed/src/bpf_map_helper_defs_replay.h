@@ -10,7 +10,8 @@
 #include <json-c/json.h>
 
 #define NUM_ELEMS 4
-
+#define MIN_PROC_ID 0
+#define MAX_PROC_ID 1024
 /* Array Stub */
 
 struct ArrayStub {
@@ -237,25 +238,59 @@ long map_update_elem(struct MapStub *map, const void *key, const void *value,
 
 struct MapofMapStub {
   char *id;
+  char *name;
   /* Storing keys, values */
   struct bpf_map_def internal_map;
+  uint lookup_num;
 };
 
-void *map_of_map_allocate(struct bpf_map_def* inner_map, unsigned int id) {
+void *map_of_map_allocate(char *outer_name, struct bpf_map_def* inner_map, unsigned int id) {
   struct MapofMapStub *arraymap = malloc(sizeof(struct MapofMapStub));
   assert(arraymap != 0);
+  arraymap->name = malloc(strlen(outer_name) + 1);
+  strcpy(arraymap->name, outer_name);
+
   arraymap->internal_map.type = inner_map->type;
   arraymap->internal_map.key_size = inner_map->key_size;
   arraymap->internal_map.value_size = inner_map->value_size;
   arraymap->internal_map.max_entries = inner_map->max_entries;
   arraymap->internal_map.map_flags = inner_map->map_flags;
   arraymap->internal_map.map_id = id;
+  
+  arraymap->lookup_num = 0;
+
   return arraymap;
 }
 
 void *map_of_map_lookup_elem(struct MapofMapStub *map, const void *key) {
   uint index = *(uint *)key;
-  assert(index == 0);
+  // assert(index == 0);
+
+  char lookup_num_str[20];
+  map->lookup_num++;
+  unsigned_to_string(map->lookup_num, lookup_num_str);
+
+  uint key_size = sizeof(uint);
+
+  char *key_str = "key_";
+  char *ret_value_str = (char *)malloc(1 + strlen(map->name) + 1 + strlen(key_str) + 1 + strlen(lookup_num_str));
+  strcpy(ret_value_str, map->name);
+  strcat(ret_value_str, "_");
+  strcat(ret_value_str, key_str);
+  strcat(ret_value_str, lookup_num_str);
+
+  char hex_string[key_size * 2 + 1]; // Two chars per byte, plus null terminator
+  for (int i = 0; i < key_size; i++) {
+    sprintf(hex_string + i * 2, "%02x", *((char *)key + i));
+  }
+
+  hex_string[key_size * 2] = '\0';  // Null-terminate the string
+
+  if (reply_output_root != NULL) {
+    // Add the hexadecimal string to the JSON object
+    json_object_object_add(reply_output_root, ret_value_str, json_object_new_string(hex_string));
+  }
+
   return &(map->internal_map);
 }
 

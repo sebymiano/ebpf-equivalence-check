@@ -36,7 +36,7 @@ int main(int argc, char** argv){
   OPENED_INIT(argc, argv);
 
   BPF_MAP_INIT(&vip_map, "vip_map", "pkt.vip", "vip_metadata");
-  BPF_MAP_OF_MAPS_INIT(&lru_mapping, &fallback_cache, "flowtable", "pkt.flow", "backend");
+  BPF_MAP_OF_MAPS_INIT(&lru_mapping, &fallback_cache, "lru_mapping", "flowtable", "pkt.flow", "backend");
   BPF_MAP_INIT(&fallback_cache, "flowtable", "pkt.flow", "backend");
   BPF_MAP_INIT(&ch_rings, "vip_to_real_map", "", "backend_real_id");
   BPF_MAP_INIT(&reals, "backend_metadata_map", "", "backend_metadata");

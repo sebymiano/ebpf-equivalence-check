@@ -207,10 +207,10 @@ void bpf_map_init_stub(struct bpf_map_def *map, char *name, char *key_type, char
   return;
 }
 
-void bpf_map_of_maps_init_stub(struct bpf_map_def* outer, struct bpf_map_def* inner, char *name, char *key_type, char * val_type){
+void bpf_map_of_maps_init_stub(struct bpf_map_def* outer, struct bpf_map_def* inner, char *outer_name, char *name, char *key_type, char * val_type){
   outer->map_id = bpf_map_ctr++;
   assert(outer->type == 12 || outer->type == 13);
-  bpf_map_stubs[outer->map_id] = map_of_map_allocate(inner,bpf_map_ctr);
+  bpf_map_stubs[outer->map_id] = map_of_map_allocate(outer_name,inner,bpf_map_ctr);
   bpf_map_stub_types[outer->map_id] = MapofMapStub;
   assert(inner->type == 1 || inner->type == 5 || inner->type == 9);
   bpf_map_stubs[bpf_map_ctr] = map_allocate(name, key_type, val_type, inner->key_size, inner->value_size, inner->max_entries);
@@ -226,11 +226,11 @@ void bpf_map_reset_stub(struct bpf_map_def* map) {
     assert(0 && "Reset unsupported for given map type");
 }
 #define BPF_MAP_INIT(x,y,z,w) bpf_map_init_stub(x,y,z,w)
-#define BPF_MAP_OF_MAPS_INIT(x,y,z,w,v) bpf_map_of_maps_init_stub(x,y,z,w,v)
+#define BPF_MAP_OF_MAPS_INIT(x,y,u,z,w,v) bpf_map_of_maps_init_stub(x,y,u,z,w,v)
 #define BPF_MAP_RESET(x) bpf_map_reset_stub(x)
 #else
 #define BPF_MAP_INIT(x,y,z,w)
-#define BPF_MAP_OF_MAPS_INIT(x,y,z,w,v)
+#define BPF_MAP_OF_MAPS_INIT(x,y,u,z,w,v)
 
 #define klee_make_symbolic(...) (0)
 #define klee_int(...) (0)
@@ -562,7 +562,12 @@ static __attribute__ ((noinline)) __u32 bpf_get_smp_processor_id(void){
     klee_trace_ret();
     klee_add_bpf_call();
   }
-  return RANDOM_NUM;
+
+  __u32 proc_id;
+  klee_make_symbolic(&proc_id, sizeof(proc_id), "proc_id");
+  klee_assume((proc_id >= MIN_PROC_ID) && (proc_id <= MAX_PROC_ID));
+  return proc_id;
+  // return RANDOM_NUM;
 }
 #else
 static __u32 (*bpf_get_smp_processor_id)(void) = (void *)8;
