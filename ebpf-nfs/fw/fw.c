@@ -32,6 +32,8 @@ struct __attribute__((__packed__)) pkt {
 };
 
 int main(int argc, char** argv){
+  OPENED_INIT(argc, argv);
+
   BPF_MAP_INIT(&tx_port, "tx_devices_map", "", "tx_device");
   BPF_MAP_INIT(&flow_ctx_table, "flowtable", "pkt.flow", "output_port");
 
@@ -61,8 +63,14 @@ int main(int argc, char** argv){
   test.ingress_ifindex = temp;
   test.rx_queue_index = 0;
   
+  int ret;
   bpf_begin();
-  if (xdp_fw_prog(&test))
-    return 1;
-  return 0;
+  if (xdp_fw_prog(&test)) {
+    ret = 1;
+  } else {
+    ret = 0;
+  }
+  
+  OPENED_CLOSE();
+  return ret;
 }

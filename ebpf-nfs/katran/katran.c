@@ -33,6 +33,8 @@
 #include "katran_pkts.h"
 
 int main(int argc, char** argv){
+  OPENED_INIT(argc, argv);
+
   BPF_MAP_INIT(&vip_map, "vip_map", "pkt.vip", "vip_metadata");
   BPF_MAP_OF_MAPS_INIT(&lru_mapping, &fallback_cache, "flowtable", "pkt.flow", "backend");
   BPF_MAP_INIT(&fallback_cache, "flowtable", "pkt.flow", "backend");
@@ -80,9 +82,15 @@ int main(int argc, char** argv){
   test.ingress_ifindex = 0;
   test.rx_queue_index = 0;
 
+  int ret;
   bpf_begin();
-  if (balancer_ingress(&test))
-    return 1;
-  return 0;
+  if (balancer_ingress(&test)) {
+    ret = 1;
+  } else {
+    ret = 0;
+  }
+  
+  OPENED_CLOSE();
+  return ret;
 }
 

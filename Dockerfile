@@ -244,6 +244,17 @@ RUN cd /llvm/build/lib && rm -rf *.a
 
 ENV LD_LIBRARY_PATH=/llvm/build/lib:/klee/build/lib/:$LD_LIBRARY_PATH
 
+WORKDIR /libjson-c
+
+RUN git clone --depth 1 --branch json-c-0.17-20230812 https://github.com/json-c/json-c.git /libjson-c
+RUN mkdir json-c-build
+RUN cd json-c-build \
+    && cmake .. \
+    && make -j \
+    && make install
+
+ENV LD_LIBRARY_PATH=/usr/local/lib:/llvm/build/lib:/klee/build/lib/:$LD_LIBRARY_PATH
+
 WORKDIR /pix
 
 # ADD ebpf-nfs/ /pix/ebpf-nfs

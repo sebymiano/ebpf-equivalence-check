@@ -71,7 +71,7 @@ void *array_lookup_elem(struct ArrayStub *array, const void *key) {
   array->lookup_num++;
   unsigned_to_string(array->lookup_num, lookup_num_str);
 
-  char *val_str = "val_";
+  char *val_str = "val";
   char *ret_value_str = (char *)malloc(1 + strlen(array->name) + 1 + strlen(val_str) + 1 + strlen(lookup_num_str));
   strcpy(ret_value_str, array->name);
   strcat(ret_value_str, "_");
@@ -191,7 +191,7 @@ void *map_lookup_elem(struct MapStub *map, const void *key) {
     map->key_deleted[map->keys_seen] = 0;
     map->keys_seen++;
 
-    char *val_str = "val_";
+    char *val_str = "val";
     char *ret_value_str = (char *)malloc(1 + strlen(map->name) + 1 + strlen(val_str) + 1 + strlen(lookup_num_str));
     strcpy(ret_value_str, map->name);
     strcat(ret_value_str, "_");

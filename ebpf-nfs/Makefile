@@ -7,7 +7,11 @@ PIX_DIR:= $(ROOT_DIR)/../..
 LLC ?= llc
 CLANG ?= clang
 CC := gcc
+PKG_CONFIG := pkg-config
 UNAME_P := $(shell uname -p)
+
+LIBJSON_PKG_CFLAGS := $(shell $(PKG_CONFIG) --cflags json-c)
+LIBJSON_PKG_LIBS := $(shell $(PKG_CONFIG) --static --libs json-c)
 
 XDP_C = ${XDP_TARGETS:=.c}
 XDP_BPF = ${XDP_BPF_TARGETS:=.c}
@@ -79,6 +83,7 @@ xdp-target-runtest: $(XDP_C) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
 	    -D __BPF_TRACING__ -DKLEE_VERIFICATION -DREPLAY \
 		-DOPENED_EQUIVALENCE\
 	    $(BPF_CFLAGS) \
+		$(LIBJSON_PKG_CFLAGS) \
 	    -I $(KLEE_INCLUDE) \
 	    -Wall \
 	    -Wno-unused-value \
@@ -87,7 +92,9 @@ xdp-target-runtest: $(XDP_C) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
 	    -Werror \
 	    -fno-builtin \
 		-L/klee/build/lib/ \
-	    -O2 -o ${XDP_C:.c=.bin} $(XDP_C) -lkleeRuntest
+		$(LIBJSON_PKG_LIBS) \
+		-lkleeRuntest \
+	    -O2 -o ${XDP_C:.c=.bin} $(XDP_C) 
 
 xdp-target-origin: $(XDP_BPF) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
 	cp ${XDP_BPF:.c=.h} $(XDP_BPF)

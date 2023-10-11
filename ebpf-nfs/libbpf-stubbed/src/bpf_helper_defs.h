@@ -47,8 +47,24 @@ struct bpf_map_def {
 #if (defined USES_BPF_MAPS) && (defined KLEE_VERIFICATION)
 #ifndef REPLAY
 #include "bpf/bpf_map_helper_defs.h"
+#define OPENED_INIT(...) (0)
+#define OPENED_CLOSE() (0)
 #else 
+#include <json-c/json.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <dirent.h>
+#include <sys/types.h> 
+#include <errno.h>
+char *reply_test_dir;
+char *curr_ktest_file;
+bool replay_mode = false;
+char *json_file_path = NULL;
+json_object *reply_output_root = NULL;
 #include "bpf/bpf_map_helper_defs_replay.h"
+
+#define OPENED_INIT(x,y) opened_test_init(x,y)
+#define OPENED_CLOSE() opened_test_close()
 #endif 
 
 #include <assert.h>
@@ -63,6 +79,97 @@ enum MapStubTypes bpf_map_stub_types[MAX_BPF_MAPS];
 unsigned int bpf_map_ctr = 0;
 unsigned int record_calls = 0;
 char *prefix; /* For tracing */
+
+#ifdef REPLAY
+void opened_test_init(int argc, char** argv) {
+  /* Check if an argument with the -d option has been passed to this function */
+  replay_mode = true;
+
+  reply_test_dir = ".";
+
+  if (argc > 1) {
+    if (strcmp(argv[1], "-d") == 0) {
+      reply_test_dir = argv[2];
+    }
+  }
+
+  /* Check if the directory exists */
+  DIR* dir = opendir(reply_test_dir);
+  if (dir) {
+    /* Directory exists. */
+    closedir(dir);
+  } else if (ENOENT == errno) {
+    /* Directory does not exist. */
+    printf("Directory %s does not exist\n", reply_test_dir);
+    exit(1);
+  } else {
+    /* opendir() failed for some other reason. */
+    printf("Directory %s does not exist\n", reply_test_dir);
+    exit(1);
+  }
+
+  /* Get environment variable with name KTEST_FILE */
+  curr_ktest_file = getenv("KTEST_FILE");
+  if (curr_ktest_file == NULL) {
+    printf("Environment variable KTEST_FILE not set\n");
+    exit(1);
+  }
+
+  /* If the KTEST_FILE contains a path, I just want to extract the file name */
+  char *last_slash = strrchr(curr_ktest_file, '/');
+  if (last_slash != NULL) {
+    curr_ktest_file = last_slash + 1;
+  }
+
+  /* Open a new file with the name of curr_ktest_file, but with .json extension */
+  char *json_file_name = (char *)malloc(1 + strlen(curr_ktest_file) + strlen(".json"));
+
+  /* Check malloc */
+  if (json_file_name == NULL) {
+    printf("Error allocating memory for json file name\n");
+    exit(1);
+  }
+
+  strcpy(json_file_name, curr_ktest_file);
+  strcat(json_file_name, ".json");
+
+  /* Open the file inside reply_test_dir */
+  json_file_path = (char *)malloc(1 + strlen(reply_test_dir) + strlen("/") + strlen(json_file_name));
+
+  /* Check malloc */
+  if (json_file_path == NULL) {
+    printf("Error allocating memory for json file path\n");
+    exit(1);
+  }
+
+  strcpy(json_file_path, reply_test_dir);
+  strcat(json_file_path, "/");
+  strcat(json_file_path, json_file_name);
+
+  reply_output_root = json_object_new_object();
+  if (reply_output_root == NULL) {
+    printf("Error creating json object\n");
+    exit(1);
+  }
+}
+
+void opened_test_close() {
+  if (reply_output_root == NULL) {
+    printf("Error closing json file\n");
+    exit(1);
+  }
+
+  if (json_object_to_file_ext(json_file_path, reply_output_root, JSON_C_TO_STRING_PRETTY)) {
+      printf("Error: failed to save %s!!\n", json_file_path);
+      exit(1);
+  } else {
+      printf("%s saved.\n", json_file_path);
+  }
+
+  // cleanup and exit
+  json_object_put(reply_output_root);
+}
+#endif
 
 /* This is the same list of PCVs and OVs as in the contract file. This is
  * unfortunate duplication and should be fixed */

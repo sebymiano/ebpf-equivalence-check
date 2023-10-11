@@ -7,6 +7,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#include <json-c/json.h>
+
 #define NUM_ELEMS 4
 
 /* Array Stub */
@@ -73,13 +75,25 @@ void *array_lookup_elem(struct ArrayStub *array, const void *key) {
   strcat(ret_value_str, key_str);
   strcat(ret_value_str, lookup_num_str);
 
-  printf("Value for key: %s\n", ret_value_str);
-  printf("0x");
-  char *key_char_ptr = (char *)key;
+  char hex_string[array->key_size * 2 + 1]; // Two chars per byte, plus null terminator
   for (int i = 0; i < array->key_size; i++) {
-    printf("%02x", *(key_char_ptr + i));
+    sprintf(hex_string + i * 2, "%02x", *((char *)key + i));
   }
-  printf("\n");
+
+  hex_string[array->key_size * 2] = '\0';  // Null-terminate the string
+
+  if (reply_output_root != NULL) {
+    // Add the hexadecimal string to the JSON object
+    json_object_object_add(reply_output_root, ret_value_str, json_object_new_string(hex_string));
+  }
+
+  // printf("Value for key: %s\n", ret_value_str);
+  // printf("0x");
+  // char *key_char_ptr = (char *)key;
+  // for (int i = 0; i < array->key_size; i++) {
+  //   printf("%02x", *(key_char_ptr + i));
+  // }
+  // printf("\n");
 
   return val_ptr;
 }
@@ -154,14 +168,26 @@ void *map_lookup_elem(struct MapStub *map, const void *key) {
   strcat(ret_value_str, key_str);
   strcat(ret_value_str, lookup_num_str);
 
-  printf("Value for key: %s\n", ret_value_str);
+  // printf("Value for key: %s\n", ret_value_str);
 
-  char *key_char_ptr = (char *)key;
-  printf("0x");
+  // char *key_char_ptr = (char *)key;
+  // printf("0x");
+  // for (int i = 0; i < map->key_size; i++) {
+  //   printf("%02x", *(key_char_ptr + i));
+  // }
+  // printf("\n");
+
+  char hex_string[map->key_size * 2 + 1]; // Two chars per byte, plus null terminator
   for (int i = 0; i < map->key_size; i++) {
-    printf("%02x", *(key_char_ptr + i));
+    sprintf(hex_string + i * 2, "%02x", *((char *)key + i));
   }
-  printf("\n");
+
+  hex_string[map->key_size * 2] = '\0';  // Null-terminate the string
+
+  if (reply_output_root != NULL) {
+    // Add the hexadecimal string to the JSON object
+    json_object_object_add(reply_output_root, ret_value_str, json_object_new_string(hex_string));
+  }
 
   for (int n = 0; n < map->keys_seen; ++n) {
     void *key_ptr = map->keys_present + n * map->key_size;
