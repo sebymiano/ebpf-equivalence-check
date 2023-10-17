@@ -243,11 +243,12 @@ long map_update_elem(struct MapStub *map, const void *key, const void *value,
 
 struct MapofMapStub {
   char *id;
+  char *name;
   /* Storing keys, values */
   struct bpf_map_def internal_map;
 };
 
-void *map_of_map_allocate(struct bpf_map_def* inner_map, unsigned int id) {
+void *map_of_map_allocate(char *outer_name, struct bpf_map_def* inner_map, unsigned int id) {
   struct MapofMapStub *arraymap = malloc(sizeof(struct MapofMapStub));
   klee_assert(arraymap != 0);
   arraymap->internal_map.type = inner_map->type;

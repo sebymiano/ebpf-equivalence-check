@@ -263,7 +263,7 @@ void *map_of_map_allocate(char *outer_name, struct bpf_map_def* inner_map, unsig
 }
 
 void *map_of_map_lookup_elem(struct MapofMapStub *map, const void *key) {
-  uint index = *(uint *)key;
+  // uint index = *(uint *)key;
   // assert(index == 0);
 
   char lookup_num_str[20];
