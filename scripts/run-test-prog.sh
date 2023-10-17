@@ -1,7 +1,5 @@
 #!/bin/bash
 
-#!/bin/bash
-
 # Function to display usage information
 usage() {
   echo "Usage: $0 -d <input_directory> -o <output_directory> -b <binary>"
@@ -14,7 +12,7 @@ usage() {
 
 # Initialize variables
 input_dir=""
-output_dir="ktest-text"
+output_dir=""
 binary=""
 
 # Parse command line options
@@ -41,7 +39,7 @@ while getopts "d:o:b:h" opt; do
 done
 
 # Check if all parameters are specified
-if [ -z "$input_dir" ]; then
+if [ -z "$input_dir" ] || [ -z "$output_dir" ] || [ -z "$binary" ]; then
   usage
   exit 1
 fi
@@ -56,8 +54,6 @@ ktest_files=$(find "$input_dir"/ -name "*.ktest" | sort)
 
 # Loop through each .ktest file
 for ktest_file in $ktest_files; do
-  ktest_name=$(basename "$ktest_file")
   echo "Processing $ktest_file..."
-  ktest-tool ${ktest_file} > ${output_dir}/${ktest_name%.ktest}.txt
+  KTEST_FILE=$ktest_file $binary -d "$output_dir"
 done
-

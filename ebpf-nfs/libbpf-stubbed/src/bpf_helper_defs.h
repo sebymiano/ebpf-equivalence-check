@@ -61,6 +61,7 @@ char *curr_ktest_file;
 bool replay_mode = false;
 char *json_file_path = NULL;
 json_object *reply_output_root = NULL;
+
 #include "bpf/bpf_map_helper_defs_replay.h"
 
 #define OPENED_INIT(x,y) opened_test_init(x,y)
@@ -336,14 +337,18 @@ static __attribute__ ((noinline)) void *bpf_map_lookup_elem(void *map, const voi
   struct bpf_map_def *map_ptr = ((struct bpf_map_def *)map);
   TRACE_VAL((uint32_t)(map_ptr), "map", _u32)
   TRACE_VAR(map_ptr->type, "bpf_map_type");
-  if (bpf_map_stub_types[map_ptr->map_id] == ArrayStub)
+  if (bpf_map_stub_types[map_ptr->map_id] == ArrayStub) {
+    // printf("Call to array_lookup_elem\n");
     return array_lookup_elem(bpf_map_stubs[map_ptr->map_id], key);
-  else if (bpf_map_stub_types[map_ptr->map_id] == MapStub)
+  } else if (bpf_map_stub_types[map_ptr->map_id] == MapStub) {
+    // printf("Call to map_lookup_elem\n");
     return map_lookup_elem(bpf_map_stubs[map_ptr->map_id], key);
-  else if (bpf_map_stub_types[map_ptr->map_id] == MapofMapStub)
+  } else if (bpf_map_stub_types[map_ptr->map_id] == MapofMapStub) {
+    // printf("Call to map_of_map_lookup_elem\n");
     return map_of_map_lookup_elem(bpf_map_stubs[map_ptr->map_id], key);
-  else
+  } else {
     assert(0 && "Unsupported map type");
+  }
 }
 #else
 static __attribute__ ((noinline)) void *bpf_map_lookup_elem(void *map, const void *key) {

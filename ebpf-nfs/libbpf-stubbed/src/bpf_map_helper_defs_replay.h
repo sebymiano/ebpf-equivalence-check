@@ -37,6 +37,7 @@ void *array_allocate(char* name, char* data_type, unsigned int value_size, unsig
   array->capacity = max_entries;
   array->value_size = value_size;
   array->key_size = sizeof(int);
+  array->lookup_num = 0;
   return array;
 }
 
@@ -61,42 +62,62 @@ void unsigned_to_string(unsigned int num, char *str) {
 }
 
 void *array_lookup_elem(struct ArrayStub *array, const void *key) {
+  array->lookup_num++;
+
+  {
+    uint index = *(uint *)key;
+    assert(index < array->capacity);
+    // void *val_ptr = array->data + index * array->value_size;
+
+    char lookup_num_str[20];
+    
+    unsigned_to_string(array->lookup_num, lookup_num_str);
+
+    char *key_str = "key_";
+    char *ret_value_str = (char *)malloc(1 + strlen(array->name) + 1 + strlen(key_str) + 1 + strlen(lookup_num_str));
+    strcpy(ret_value_str, array->name);
+    strcat(ret_value_str, "_");
+    strcat(ret_value_str, key_str);
+    strcat(ret_value_str, lookup_num_str);
+
+    // printf("Creating key: %s\n", ret_value_str);
+
+    char hex_string[array->key_size * 2 + 1]; // Two chars per byte, plus null terminator
+    for (int i = 0; i < array->key_size; i++) {
+      sprintf(hex_string + i * 2, "%02x", *((char *)key + i));
+    }
+
+    hex_string[array->key_size * 2] = '\0';  // Null-terminate the string
+
+    if (reply_output_root != NULL) {
+      // Add the hexadecimal string to the JSON object
+      json_object_object_add(reply_output_root, ret_value_str, json_object_new_string(hex_string));
+    }
+  }
+
   uint index = *(uint *)key;
-  assert(index < array->capacity);
-  void *val_ptr = array->data + index * array->value_size;
+  klee_assume(index < array->capacity);
+  // void *val_ptr = array->data + index * array->value_size;
+
+  // klee_warning("Calling right bpf_map_lookup_elem for ARRAY");
 
   char lookup_num_str[20];
-  array->lookup_num++;
+  // array->lookup_num++;
   unsigned_to_string(array->lookup_num, lookup_num_str);
 
-  char *key_str = "key_";
-  char *ret_value_str = (char *)malloc(1 + strlen(array->name) + 1 + strlen(key_str) + 1 + strlen(lookup_num_str));
+  char *val_str = "val";
+  char *ret_value_str = (char *)malloc(1 + strlen(array->name) + 1 + strlen(val_str) + 1 + strlen(lookup_num_str));
   strcpy(ret_value_str, array->name);
   strcat(ret_value_str, "_");
-  strcat(ret_value_str, key_str);
+  strcat(ret_value_str, val_str);
+  // strcat(ret_value_str, "_");
   strcat(ret_value_str, lookup_num_str);
 
-  char hex_string[array->key_size * 2 + 1]; // Two chars per byte, plus null terminator
-  for (int i = 0; i < array->key_size; i++) {
-    sprintf(hex_string + i * 2, "%02x", *((char *)key + i));
-  }
+  void *ret_value = malloc(array->value_size);
+  klee_make_symbolic(ret_value, array->value_size, ret_value_str);
+  return ret_value;
 
-  hex_string[array->key_size * 2] = '\0';  // Null-terminate the string
-
-  if (reply_output_root != NULL) {
-    // Add the hexadecimal string to the JSON object
-    json_object_object_add(reply_output_root, ret_value_str, json_object_new_string(hex_string));
-  }
-
-  // printf("Value for key: %s\n", ret_value_str);
-  // printf("0x");
-  // char *key_char_ptr = (char *)key;
-  // for (int i = 0; i < array->key_size; i++) {
-  //   printf("%02x", *(key_char_ptr + i));
-  // }
-  // printf("\n");
-
-  return val_ptr;
+  // return val_ptr;
 }
 
 long array_update_elem(struct ArrayStub *array, const void *key,
@@ -150,60 +171,92 @@ void *map_allocate(char* name, char* key_type, char* val_type, unsigned int key_
   map->keys_present = calloc(max_entries, key_size);
   map->values_present = calloc(max_entries, value_size);
   assert(map->keys_present && map->values_present);
+  klee_make_symbolic(map->values_present, max_entries*value_size, map->val_type);
   for (int n = 0; n < NUM_ELEMS; ++n) {
     map->key_deleted[n] = 0;
     map->keys_cached[n] = 0;
   }
+
+  map->lookup_num = 0;
   return map;
 }
 
 void *map_lookup_elem(struct MapStub *map, const void *key) {
-  char lookup_num_str[20];
   map->lookup_num++;
-  unsigned_to_string(map->lookup_num, lookup_num_str);
+  {
+    char lookup_num_str[20];
+    unsigned_to_string(map->lookup_num, lookup_num_str);
 
-  char *key_str = "key_";
-  char *ret_value_str = (char *)malloc(1 + strlen(map->name) + 1 + strlen(key_str) + 1 + strlen(lookup_num_str));
-  strcpy(ret_value_str, map->name);
-  strcat(ret_value_str, "_");
-  strcat(ret_value_str, key_str);
-  strcat(ret_value_str, lookup_num_str);
+    char *key_str = "key_";
+    char *ret_value_str = (char *)malloc(1 + strlen(map->name) + 1 + strlen(key_str) + 1 + strlen(lookup_num_str));
+    strcpy(ret_value_str, map->name);
+    strcat(ret_value_str, "_");
+    strcat(ret_value_str, key_str);
+    strcat(ret_value_str, lookup_num_str);
 
-  // printf("Value for key: %s\n", ret_value_str);
+    // printf("Creating key: %s\n", ret_value_str);
 
-  // char *key_char_ptr = (char *)key;
-  // printf("0x");
-  // for (int i = 0; i < map->key_size; i++) {
-  //   printf("%02x", *(key_char_ptr + i));
-  // }
-  // printf("\n");
+    // printf("Value for key: %s\n", ret_value_str);
 
-  char hex_string[map->key_size * 2 + 1]; // Two chars per byte, plus null terminator
-  for (int i = 0; i < map->key_size; i++) {
-    sprintf(hex_string + i * 2, "%02x", *((char *)key + i));
-  }
+    // char *key_char_ptr = (char *)key;
+    // printf("0x");
+    // for (int i = 0; i < map->key_size; i++) {
+    //   printf("%02x", *(key_char_ptr + i));
+    // }
+    // printf("\n");
 
-  hex_string[map->key_size * 2] = '\0';  // Null-terminate the string
+    char hex_string[map->key_size * 2 + 1]; // Two chars per byte, plus null terminator
+    for (int i = 0; i < map->key_size; i++) {
+      sprintf(hex_string + i * 2, "%02x", *((char *)key + i));
+    }
 
-  if (reply_output_root != NULL) {
-    // Add the hexadecimal string to the JSON object
-    json_object_object_add(reply_output_root, ret_value_str, json_object_new_string(hex_string));
-  }
+    hex_string[map->key_size * 2] = '\0';  // Null-terminate the string
 
-  for (int n = 0; n < map->keys_seen; ++n) {
-    void *key_ptr = map->keys_present + n * map->key_size;
-    if (memcmp(key_ptr, key, map->key_size)) {
-      if (map->key_deleted[n])
-        return NULL;
-      else {
-        void *val_ptr = map->values_present + n * map->value_size;
-        if (!(map->keys_cached[n]))
-          map->keys_cached[n] = 1;
-        return val_ptr;
-      }
+    if (reply_output_root != NULL) {
+      // Add the hexadecimal string to the JSON object
+      json_object_object_add(reply_output_root, ret_value_str, json_object_new_string(hex_string));
     }
   }
-  return NULL;
+
+  char *sym_name = "_in_";
+  char lookup_num_str[20];
+  // map->lookup_num++;
+
+  unsigned_to_string(map->lookup_num, lookup_num_str);
+  char *final_sym_name = (char *)malloc(1 + strlen(map->key_type) +
+                                        strlen(sym_name) + strlen(map->name) +
+                                        strlen(lookup_num_str));
+  strcpy(final_sym_name, map->key_type);
+  strcat(final_sym_name, sym_name);
+  strcat(final_sym_name, map->name);
+  strcat(final_sym_name, lookup_num_str);
+  int map_has_this_key = klee_int(final_sym_name);
+
+  // void *key_ptr = map->keys_present + map->keys_seen * map->key_size;
+  // memcpy(key_ptr, key, map->key_size);
+  // void *val_ptr = map->values_present + map->keys_seen * map->value_size;
+
+  if (map_has_this_key) {
+    map->key_deleted[map->keys_seen] = 0;
+    map->keys_seen++;
+
+    char *val_str = "val";
+    char *ret_value_str = (char *)malloc(1 + strlen(map->name) + 1 + strlen(val_str) + 1 + strlen(lookup_num_str));
+    strcpy(ret_value_str, map->name);
+    strcat(ret_value_str, "_");
+    strcat(ret_value_str, val_str);
+    // strcat(ret_value_str, "_");
+    strcat(ret_value_str, lookup_num_str);
+
+    void *ret_value = malloc(map->value_size);
+    klee_make_symbolic(ret_value, map->value_size, ret_value_str);
+
+    return ret_value;
+  } else {
+    map->key_deleted[map->keys_seen] = 1;
+    map->keys_seen++;
+    return NULL;
+  }
 }
 
 long map_update_elem(struct MapStub *map, const void *key, const void *value,
