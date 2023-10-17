@@ -57,7 +57,6 @@ struct bpf_map_def {
 #include <sys/types.h> 
 #include <errno.h>
 char *reply_test_dir;
-char *curr_ktest_file;
 bool replay_mode = false;
 char *json_file_path = NULL;
 json_object *reply_output_root = NULL;
@@ -83,6 +82,7 @@ char *prefix; /* For tracing */
 
 #ifdef REPLAY
 void opened_test_init(int argc, char** argv) {
+  char *curr_ktest_file;
   /* Check if an argument with the -d option has been passed to this function */
   replay_mode = true;
 
@@ -116,14 +116,22 @@ void opened_test_init(int argc, char** argv) {
     exit(1);
   }
 
+  char *new_curr_ktest_file = strdup(curr_ktest_file);
+
   /* If the KTEST_FILE contains a path, I just want to extract the file name */
-  char *last_slash = strrchr(curr_ktest_file, '/');
+  char *last_slash = strrchr(new_curr_ktest_file, '/');
   if (last_slash != NULL) {
-    curr_ktest_file = last_slash + 1;
+    new_curr_ktest_file = last_slash + 1;
+  }
+
+  /* Now I want to remove the extension from the curr_ktest_file */
+  char *last_dot = strrchr(new_curr_ktest_file, '.');
+  if (last_dot != NULL) {
+    *last_dot = '\0';
   }
 
   /* Open a new file with the name of curr_ktest_file, but with .json extension */
-  char *json_file_name = (char *)malloc(1 + strlen(curr_ktest_file) + strlen(".json"));
+  char *json_file_name = (char *)malloc(1 + strlen(new_curr_ktest_file) + strlen(".json"));
 
   /* Check malloc */
   if (json_file_name == NULL) {
@@ -131,7 +139,7 @@ void opened_test_init(int argc, char** argv) {
     exit(1);
   }
 
-  strcpy(json_file_name, curr_ktest_file);
+  strcpy(json_file_name, new_curr_ktest_file);
   strcat(json_file_name, ".json");
 
   /* Open the file inside reply_test_dir */

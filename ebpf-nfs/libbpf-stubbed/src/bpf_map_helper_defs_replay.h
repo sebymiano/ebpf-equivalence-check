@@ -82,12 +82,14 @@ void *array_lookup_elem(struct ArrayStub *array, const void *key) {
 
     // printf("Creating key: %s\n", ret_value_str);
 
-    char hex_string[array->key_size * 2 + 1]; // Two chars per byte, plus null terminator
+    char hex_string[2 + array->key_size * 2 + 1]; // Two chars per byte, plus null terminator
+    hex_string[0] = '0';
+    hex_string[1] = 'x';
     for (int i = 0; i < array->key_size; i++) {
-      sprintf(hex_string + i * 2, "%02x", *((char *)key + i));
+      sprintf(hex_string + 2 + i * 2, "%02x", *((char *)key + i));
     }
 
-    hex_string[array->key_size * 2] = '\0';  // Null-terminate the string
+    hex_string[2 + array->key_size * 2] = '\0';  // Null-terminate the string
 
     if (reply_output_root != NULL) {
       // Add the hexadecimal string to the JSON object
@@ -193,12 +195,14 @@ void *map_lookup_elem(struct MapStub *map, const void *key) {
     strcat(ret_value_str, "_");
     strcat(ret_value_str, map->name);
 
-    char hex_string[map->key_size * 2 + 1]; // Two chars per byte, plus null terminator
+    char hex_string[2 + map->key_size * 2 + 1]; // Two chars per byte, plus null terminator
+    hex_string[0] = '0';
+    hex_string[1] = 'x';
     for (int i = 0; i < map->key_size; i++) {
-      sprintf(hex_string + i * 2, "%02x", *((char *)key + i));
+      sprintf(hex_string + 2 + i * 2, "%02x", *((char *)key + i));
     }
 
-    hex_string[map->key_size * 2] = '\0';  // Null-terminate the string
+    hex_string[2 + map->key_size * 2] = '\0';  // Null-terminate the string
 
     if (reply_output_root != NULL) {
       // Add the hexadecimal string to the JSON object
@@ -312,12 +316,14 @@ void *map_of_map_lookup_elem(struct MapofMapStub *map, const void *key) {
   strcat(ret_value_str, "_");
   strcat(ret_value_str, map->name);
 
-  char hex_string[key_size * 2 + 1]; // Two chars per byte, plus null terminator
+  char hex_string[2 + key_size * 2 + 1]; // 0x + two chars per byte, plus null terminator
+  hex_string[0] = '0';
+  hex_string[1] = 'x';
   for (int i = 0; i < key_size; i++) {
-    sprintf(hex_string + i * 2, "%02x", *((char *)key + i));
+    sprintf(hex_string + 2 + i * 2, "%02x", *((char *)key + i));
   }
 
-  hex_string[key_size * 2] = '\0';  // Null-terminate the string
+  hex_string[2 + key_size * 2] = '\0';  // Null-terminate the string
 
   if (reply_output_root != NULL) {
     // Add the hexadecimal string to the JSON object
