@@ -96,7 +96,7 @@ long array_update_elem(struct ArrayStub *array, const void *key,
 }
 
 void array_reset(struct ArrayStub *array){
-  klee_make_symbolic(array->data,(array->capacity * array->value_size), array->data_type);
+  // klee_make_symbolic(array->data,(array->capacity * array->value_size), array->data_type);
 }
 
 /* Map Stub */
@@ -138,7 +138,7 @@ void *map_allocate(char* name, char* key_type, char* val_type, unsigned int key_
   map->values_present = calloc(max_entries, value_size);
   klee_assert(map->keys_present && map->values_present);
   // klee_make_symbolic(map->keys_present, max_entries*key_size, map->key_type);
-  klee_make_symbolic(map->values_present, max_entries*value_size, map->val_type);
+  // klee_make_symbolic(map->values_present, max_entries*value_size, map->val_type);
   for (int n = 0; n < NUM_ELEMS; ++n) {
     map->key_deleted[n] = 0;
     // To speed up symbex when prototyping stuff unrelated to exec cycles, make

@@ -171,7 +171,7 @@ void *map_allocate(char* name, char* key_type, char* val_type, unsigned int key_
   map->keys_present = calloc(max_entries, key_size);
   map->values_present = calloc(max_entries, value_size);
   assert(map->keys_present && map->values_present);
-  klee_make_symbolic(map->values_present, max_entries*value_size, map->val_type);
+  // klee_make_symbolic(map->values_present, max_entries*value_size, map->val_type);
   for (int n = 0; n < NUM_ELEMS; ++n) {
     map->key_deleted[n] = 0;
     map->keys_cached[n] = 0;

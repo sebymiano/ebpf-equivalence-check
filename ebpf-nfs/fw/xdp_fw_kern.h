@@ -126,12 +126,12 @@ int xdp_fw_prog(struct xdp_md *ctx)
 		goto EOP;
 
 	if(ip->protocol == IPPROTO_TCP){
-			VIGOR_TAG(TRAFFIC_CLASS, TCP);
-			goto L4;
+		VIGOR_TAG(TRAFFIC_CLASS, TCP);
+		goto L4;
 	}
 	else if(ip->protocol == IPPROTO_UDP) {
-			VIGOR_TAG(TRAFFIC_CLASS, UDP);
-			goto L4;
+		VIGOR_TAG(TRAFFIC_CLASS, UDP);
+		goto L4;
 	}
 	goto EOP;
 
