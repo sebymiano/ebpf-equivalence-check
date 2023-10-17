@@ -36,14 +36,14 @@ int main(int argc, char** argv){
   OPENED_INIT(argc, argv);
 
   BPF_MAP_INIT(&vip_map, "vip_map", "pkt.vip", "vip_metadata");
-  BPF_MAP_OF_MAPS_INIT(&lru_mapping, &fallback_cache, "lru_mapping", "flowtable", "pkt.flow", "backend");
-  BPF_MAP_INIT(&fallback_cache, "flowtable", "pkt.flow", "backend");
-  BPF_MAP_INIT(&ch_rings, "vip_to_real_map", "", "backend_real_id");
-  BPF_MAP_INIT(&reals, "backend_metadata_map", "", "backend_metadata");
-  BPF_MAP_INIT(&reals_stats, "backend_stats_map", "", "backend_stats");
-  BPF_MAP_INIT(&stats, "vip_stats_map", "", "vip_stats");
-  BPF_MAP_INIT(&quic_mapping, "conn_id_to_real_map", "", "backend_real_id");
-  BPF_MAP_INIT(&ctl_array, "backend_mac_addrs_map", "", "backend_mac_addrs");
+  BPF_MAP_OF_MAPS_INIT(&lru_mapping, &fallback_cache, "lru_mapping", "fallback_cache", "pkt.flow", "backend");
+  BPF_MAP_INIT(&fallback_cache, "fallback_cache", "pkt.flow", "backend");
+  BPF_MAP_INIT(&ch_rings, "ch_rings", "", "backend_real_id");
+  BPF_MAP_INIT(&reals, "reals", "", "backend_metadata");
+  BPF_MAP_INIT(&reals_stats, "reals_stats", "", "backend_stats");
+  BPF_MAP_INIT(&stats, "stats", "", "vip_stats");
+  BPF_MAP_INIT(&quic_mapping, "quic_mapping", "", "backend_real_id");
+  BPF_MAP_INIT(&ctl_array, "ctl_array", "", "backend_mac_addrs");
 
   BPF_MAP_RESET(&reals);
   BPF_MAP_RESET(&reals_stats);

@@ -34,8 +34,8 @@ struct __attribute__((__packed__)) pkt {
 int main(int argc, char** argv){
   OPENED_INIT(argc, argv);
 
-  BPF_MAP_INIT(&tx_port, "tx_devices_map", "", "tx_device");
-  BPF_MAP_INIT(&flow_ctx_table, "flowtable", "pkt.flow", "output_port");
+  BPF_MAP_INIT(&tx_port, "tx_port", "", "tx_device");
+  BPF_MAP_INIT(&flow_ctx_table, "flow_ctx_table", "pkt.flow", "output_port");
 
   /* Init from xdp_fw_user.c */
   const uint num_ports = 2;

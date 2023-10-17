@@ -74,11 +74,11 @@ void *array_lookup_elem(struct ArrayStub *array, const void *key) {
     unsigned_to_string(array->lookup_num, lookup_num_str);
 
     char *key_str = "key_";
-    char *ret_value_str = (char *)malloc(1 + strlen(array->name) + 1 + strlen(key_str) + 1 + strlen(lookup_num_str));
-    strcpy(ret_value_str, array->name);
-    strcat(ret_value_str, "_");
-    strcat(ret_value_str, key_str);
+    char *ret_value_str = (char *)malloc(1 + strlen(key_str) + strlen(lookup_num_str) + 1 + strlen(array->name));
+    strcpy(ret_value_str, key_str);
     strcat(ret_value_str, lookup_num_str);
+    strcat(ret_value_str, "_");
+    strcat(ret_value_str, array->name);
 
     // printf("Creating key: %s\n", ret_value_str);
 
@@ -105,13 +105,12 @@ void *array_lookup_elem(struct ArrayStub *array, const void *key) {
   // array->lookup_num++;
   unsigned_to_string(array->lookup_num, lookup_num_str);
 
-  char *val_str = "val";
-  char *ret_value_str = (char *)malloc(1 + strlen(array->name) + 1 + strlen(val_str) + 1 + strlen(lookup_num_str));
-  strcpy(ret_value_str, array->name);
-  strcat(ret_value_str, "_");
-  strcat(ret_value_str, val_str);
-  // strcat(ret_value_str, "_");
+  char *val_str = "val_";
+  char *ret_value_str = (char *)malloc(1 + strlen(val_str) + strlen(lookup_num_str) + 1 + strlen(array->name));
+  strcpy(ret_value_str, val_str);
   strcat(ret_value_str, lookup_num_str);
+  strcat(ret_value_str, "_");
+  strcat(ret_value_str, array->name);
 
   void *ret_value = malloc(array->value_size);
   klee_make_symbolic(ret_value, array->value_size, ret_value_str);
@@ -188,22 +187,11 @@ void *map_lookup_elem(struct MapStub *map, const void *key) {
     unsigned_to_string(map->lookup_num, lookup_num_str);
 
     char *key_str = "key_";
-    char *ret_value_str = (char *)malloc(1 + strlen(map->name) + 1 + strlen(key_str) + 1 + strlen(lookup_num_str));
-    strcpy(ret_value_str, map->name);
-    strcat(ret_value_str, "_");
-    strcat(ret_value_str, key_str);
+    char *ret_value_str = (char *)malloc(1 + strlen(key_str) + strlen(lookup_num_str) + 1 + strlen(map->name));
+    strcpy(ret_value_str, key_str);
     strcat(ret_value_str, lookup_num_str);
-
-    // printf("Creating key: %s\n", ret_value_str);
-
-    // printf("Value for key: %s\n", ret_value_str);
-
-    // char *key_char_ptr = (char *)key;
-    // printf("0x");
-    // for (int i = 0; i < map->key_size; i++) {
-    //   printf("%02x", *(key_char_ptr + i));
-    // }
-    // printf("\n");
+    strcat(ret_value_str, "_");
+    strcat(ret_value_str, map->name);
 
     char hex_string[map->key_size * 2 + 1]; // Two chars per byte, plus null terminator
     for (int i = 0; i < map->key_size; i++) {
@@ -218,35 +206,30 @@ void *map_lookup_elem(struct MapStub *map, const void *key) {
     }
   }
 
+  char *val_str = "val_";
   char *sym_name = "_in_";
   char lookup_num_str[20];
-  // map->lookup_num++;
 
   unsigned_to_string(map->lookup_num, lookup_num_str);
-  char *final_sym_name = (char *)malloc(1 + strlen(map->key_type) +
-                                        strlen(sym_name) + strlen(map->name) +
-                                        strlen(lookup_num_str));
-  strcpy(final_sym_name, map->key_type);
+  char *final_sym_name = (char *)malloc(1 + strlen(val_str) +
+                                        strlen(lookup_num_str) + 
+                                        strlen(sym_name) + 
+                                        strlen(map->name));
+  strcpy(final_sym_name, val_str);
+  strcat(final_sym_name, lookup_num_str);
   strcat(final_sym_name, sym_name);
   strcat(final_sym_name, map->name);
-  strcat(final_sym_name, lookup_num_str);
   int map_has_this_key = klee_int(final_sym_name);
-
-  // void *key_ptr = map->keys_present + map->keys_seen * map->key_size;
-  // memcpy(key_ptr, key, map->key_size);
-  // void *val_ptr = map->values_present + map->keys_seen * map->value_size;
 
   if (map_has_this_key) {
     map->key_deleted[map->keys_seen] = 0;
     map->keys_seen++;
 
-    char *val_str = "val";
-    char *ret_value_str = (char *)malloc(1 + strlen(map->name) + 1 + strlen(val_str) + 1 + strlen(lookup_num_str));
-    strcpy(ret_value_str, map->name);
-    strcat(ret_value_str, "_");
-    strcat(ret_value_str, val_str);
-    // strcat(ret_value_str, "_");
+    char *ret_value_str = (char *)malloc(1 + strlen(val_str) + strlen(lookup_num_str) + 1 + strlen(map->name));
+    strcpy(ret_value_str, val_str);
     strcat(ret_value_str, lookup_num_str);
+    strcat(ret_value_str, "_");
+    strcat(ret_value_str, map->name);
 
     void *ret_value = malloc(map->value_size);
     klee_make_symbolic(ret_value, map->value_size, ret_value_str);
@@ -316,9 +299,6 @@ void *map_of_map_allocate(char *outer_name, struct bpf_map_def* inner_map, unsig
 }
 
 void *map_of_map_lookup_elem(struct MapofMapStub *map, const void *key) {
-  // uint index = *(uint *)key;
-  // assert(index == 0);
-
   char lookup_num_str[20];
   map->lookup_num++;
   unsigned_to_string(map->lookup_num, lookup_num_str);
@@ -326,11 +306,11 @@ void *map_of_map_lookup_elem(struct MapofMapStub *map, const void *key) {
   uint key_size = sizeof(uint);
 
   char *key_str = "key_";
-  char *ret_value_str = (char *)malloc(1 + strlen(map->name) + 1 + strlen(key_str) + 1 + strlen(lookup_num_str));
-  strcpy(ret_value_str, map->name);
-  strcat(ret_value_str, "_");
-  strcat(ret_value_str, key_str);
+  char *ret_value_str = (char *)malloc(1 + strlen(key_str) + strlen(lookup_num_str) + 1 + strlen(map->name));
+  strcpy(ret_value_str, key_str);
   strcat(ret_value_str, lookup_num_str);
+  strcat(ret_value_str, "_");
+  strcat(ret_value_str, map->name);
 
   char hex_string[key_size * 2 + 1]; // Two chars per byte, plus null terminator
   for (int i = 0; i < key_size; i++) {
