@@ -33,6 +33,12 @@
 #define A_PORT  6
 #define B_PORT 7
 
+const char *bpf_file = NULL;
+const char *ktest_file = NULL;
+const char *input_dir = NULL;
+const char *input_map_dir = NULL;
+const char *res_dir = NULL;
+
 struct packet {
   struct ethhdr ether;
   struct iphdr ipv4;
@@ -67,58 +73,239 @@ KTestObject* get_ktest_object_by_name(KTest* input, const char* name) {
     return NULL;
 }
 
-int fill_maps_with_correct_values(struct bpf_object *obj) {
-    struct bpf_map *tx_port = bpf_object__find_map_by_name(obj, "tx_port");
-    if (tx_port == NULL) {
-        log_error("ERROR: tx_port map not found!");
+const char* get_filename_from_path(const char *path) {
+    const char *filename = strrchr(path, '/');  // For Unix-like systems
+    if (filename) {
+        return filename + 1;  // Skip the '/'
+    }
+    return path;  // Return the original path if no '/' is found
+}
+
+char *get_json_file_from_dir(const char *input_map_dir, const char *filename) {
+    DIR *d;
+    struct dirent *dir;
+    d = opendir(input_map_dir);
+    if (d) {
+        while ((dir = readdir(d)) != NULL) {
+            if (dir->d_type == DT_REG) {
+                if (strstr(dir->d_name, filename) != NULL) {
+                    // log_debug("Found JSON file: %s", dir->d_name);
+
+                    char* json_file = malloc(strlen(input_map_dir) + strlen(dir->d_name) + 2);
+                    strcpy(json_file, input_map_dir);
+                    strcat(json_file, "/");
+                    strcat(json_file, dir->d_name);
+
+                    return json_file;
+                }
+            }
+        }
+        closedir(d);
+    }
+
+    return NULL;
+}
+
+int fill_maps_with_correct_values(struct bpf_object *obj, int prog_fd, const char *ktest_file_name, const char *input_map_dir) {
+    /* Get basename from path */
+    const char *ktest_file_basename = get_filename_from_path(ktest_file_name);
+
+    /* Copy basename */
+    char *filename = strdup(ktest_file_basename);
+
+    /* Remove extension from filename */
+    char *dot = strrchr(filename, '.');
+    if (dot)
+        *dot = '\0';
+
+    /* Add json extension to filename */
+    char *json_filename = malloc(strlen(filename) + strlen(".json") + 1);
+    strcpy(json_filename, filename);
+    strcat(json_filename, ".json");
+
+    log_trace("JSON filename: %s", json_filename);
+
+    free(filename);
+    
+    char *json_file = get_json_file_from_dir(input_map_dir, json_filename);
+    free(json_filename);
+
+    if (json_file == NULL) {
+        log_error("ERROR: JSON file %s not found for Ktest file %s", json_file, ktest_file_name);
         return -1;
     }
 
-    int tx_port_fd = bpf_map__fd(tx_port);
+    log_debug("JSON file found: %s", json_file);
 
-    int keys[] = {B_PORT,A_PORT};
-	int values[] = {B_PORT,A_PORT};
+    json_object *root = json_object_from_file(json_file);
+    if (!root) {
+        log_error("ERROR: failed to parse JSON file %s", json_file);
+        return -1;
+    }
 
-    for(int i = 0; i < sizeof(keys)/sizeof(keys[0]); i++){
-        if (bpf_map_update_elem(tx_port_fd, &keys[i], &values[i], BPF_ANY) == 0) {
-            log_debug("tx_port map updated with key %d and value %d", keys[i], values[i]);
-        } else {
-            log_error("ERROR: tx_port map not updated with key %d and value %d", keys[i], values[i]);
+    json_object_object_foreach(root, map_name, val) {
+        log_debug("Found key: %s", map_name);
+
+        struct bpf_map *map = bpf_object__find_map_by_name(obj, map_name);
+        if (map == NULL) {
+            log_error("ERROR: map %s not found!", map_name);
             return -1;
         }
+
+        int map_fd = bpf_map__fd(map);
+
+        /* Get info about this BPF map */
+        struct bpf_map_info map_info = {};
+        uint32_t info_len = sizeof(map_info);
+
+        if (bpf_obj_get_info_by_fd(map_fd, &map_info, &info_len)) {
+            log_error("ERROR: failed to get info for map %s", map_name);
+            return -1;
+        }
+
+        if (json_object_is_type(val, json_type_object)) {
+            json_object_object_foreach(val, lookup_str, lookup_val) {
+                int lookup_num = atoi(lookup_str);
+
+                log_trace("For map %s, lookup_num: %d", map_name, lookup_num);
+
+                bool has_value = true;
+                /* Check if val has a field called "hasValue" */
+                json_object *has_value_obj;
+                if (json_object_object_get_ex(lookup_val, "hasValue", &has_value_obj)) {
+                    if (json_object_is_type(has_value_obj, json_type_boolean)) {
+                        has_value = json_object_get_boolean(has_value_obj);
+                    } else {
+                        log_error("ERROR: hasValue field for map %s is not a boolean (lookup_num %d)", map_name, lookup_num);
+                        return -1;
+                    }
+                }
+
+                if (has_value) {
+                    const char *key;
+                    const char *value;
+                    int key_len = 0;
+                    int value_len = 0;
+
+                    /* Check if val has a field called "key" */
+                    json_object *key_obj;
+                    if (json_object_object_get_ex(lookup_val, "key", &key_obj)) {
+                        if (json_object_is_type(key_obj, json_type_string)) {
+                            key = json_object_get_string(key_obj);
+                        } else {
+                            log_error("ERROR: key for map %s is not a string (lookup_num %d)", map_name, lookup_num);
+                            return -1;
+                        }
+                    } else {
+                        log_error("ERROR: key not found for map %s (lookup_num %d)", map_name, lookup_num);
+                        return -1;
+                    }
+
+                    /* Check if val has a field called "value" */
+                    json_object *value_obj;
+                    if (json_object_object_get_ex(lookup_val, "value", &value_obj)) {
+                        if (json_object_is_type(value_obj, json_type_string)) {
+                            value = json_object_get_string(value_obj);
+                        } else {
+                            log_error("ERROR: value for map %s is not a string (lookup_num %d)", map_name, lookup_num);
+                            return -1;
+                        }
+                    } else {
+                        log_error("ERROR: value not found for map %s (lookup_num %d)", map_name, lookup_num);
+                        return -1;
+                    }
+
+                    /* Check if val has a field called "key_size" */
+                    json_object *key_size_obj;
+                    if (json_object_object_get_ex(lookup_val, "key_size", &key_size_obj)) {
+                        if (json_object_is_type(key_size_obj, json_type_int)) {
+                            key_len = json_object_get_int(key_size_obj);
+                        } else {
+                            log_error("ERROR: key_size for map %s is not an integer (lookup_num %d)", map_name, lookup_num);
+                            return -1;
+                        }
+                    } else {
+                        log_error("ERROR: key_size not found for map %s (lookup_num %d)", map_name, lookup_num);
+                        return -1;
+                    }
+
+                    /* Check if val has a field called "value_size" */
+                    json_object *value_size_obj;
+                    if (json_object_object_get_ex(lookup_val, "value_size", &value_size_obj)) {
+                        if (json_object_is_type(value_size_obj, json_type_int)) {
+                            value_len = json_object_get_int(value_size_obj);
+                        } else {
+                            log_error("ERROR: value_size for map %s is not an integer (lookup_num %d)", map_name, lookup_num);
+                            return -1;
+                        }
+                    } else {
+                        log_error("ERROR: value_size not found for map %s (lookup_num %d)", map_name, lookup_num);
+                        return -1;
+                    }
+
+                    log_trace("key: %s, value: %s, key_len: %d, value_len: %d", key, value, key_len, value_len);
+
+                    if (key_len != map_info.key_size) {
+                        log_error("ERROR: key_size for map %s is not correct (lookup_num %d) got %d, expected %d", map_name, lookup_num, key_len, map_info.key_size);
+                        return -1;
+                    }
+
+                    if (value_len != map_info.value_size) {
+                        log_error("ERROR: value_size for map %s is not correct (lookup_num %d) got %d, expected %d", map_name, lookup_num, value_len, map_info.value_size);
+                        return -1;
+                    }
+
+                    /* Convert hex value to char array */
+                    unsigned char *value_bytes = malloc(value_len);
+                    if (!value_bytes) {
+                        log_error("ERROR: failed to allocate memory for value_bytes");
+                        return -1;
+                    }
+
+                    for (int i = 0; i < value_len; i++) {
+                        sscanf(value + 2*i, "%02hhx", &value_bytes[i]);
+                    }
+
+                    /* Convert hex key to char array */
+                    unsigned char *key_bytes = malloc(key_len);
+                    if (!key_bytes) {
+                        log_error("ERROR: failed to allocate memory for key_bytes");
+                        return -1;
+                    }
+
+                    for (int i = 0; i < key_len; i++) {
+                        sscanf(key + 2*i, "%02hhx", &key_bytes[i]);
+                    }
+
+                    if (bpf_map_update_elem(map_fd, key_bytes, value_bytes, BPF_ANY) == 0) {
+                        log_debug("map %s updated with key %s and value %s", map_name, key, value);
+                    } else {
+                        log_error("ERROR: map %s not updated with key %s and value %s", map_name, key, value);
+                        return -1;
+                    }
+
+                    free(key_bytes);
+                    free(value_bytes);
+                }
+            }            
+        }
     }
+
+    /* Cleanup */
+    free(json_file);
+    json_object_put(root);
 
     return 0;
 }
 
-// int fill_maps_with_pkt_values(struct bpf_object *obj, const void *pkt, KTest* input) {
-//     const struct packet *buf_pkt = pkt;
-//     struct bpf_map *flow_ctx_table = bpf_object__find_map_by_name(obj, "flow_ctx_table");
-//     if (flow_ctx_table == NULL) {
-//         log_error("ERROR: flow_ctx_table map not found!");
-//         return -1;
-//     }
-
-//     int flow_ctx_table_fd = bpf_map__fd(flow_ctx_table);
-
-//     struct flow_ctx_table_key key = {
-//         .ip_proto = buf_pkt->ipv4.protocol,
-//         .l4_src = buf_pkt->tcp.source,
-//         .l4_dst = buf_pkt->tcp.dest,
-//         .ip_src = buf_pkt->ipv4.saddr,
-//         .ip_dst = buf_pkt->ipv4.daddr,
-//     };
-
-// }
-
-int run_bpf_program_with_ktest_file(struct bpf_object *obj, int prog_fd, const char* ktest_file, char *res_dir, const struct bpf_program *prog) {
+int run_bpf_program_with_ktest_file(struct bpf_object *obj, int prog_fd, const char* ktest_file, const char *res_dir, const struct bpf_program *prog) {
     KTest* input;
     int err, ret, ret_code = 0;
     char *buf, *buf_out;
 
     input = kTest_fromFile(ktest_file);
     if (!input) {
-        log_error("ERROR: input file %s not valid.\n", ktest_file);
+        log_error("ERROR: input file %s not valid.", ktest_file);
         return -1;
     }
 
@@ -128,8 +315,8 @@ int run_bpf_program_with_ktest_file(struct bpf_object *obj, int prog_fd, const c
     log_debug("The Ktest file has %d objects.", input->numObjects);
     for (int i = 0; i < input->numObjects; i++) {
         KTestObject* obj = &input->objects[i];
-        log_debug("Object %d has %d bytes.", i, obj->numBytes);
-        log_debug("Object %d has name %s.", i, obj->name);
+        log_trace("Object %d has %d bytes.", i, obj->numBytes);
+        log_trace("Object %d has name %s.", i, obj->name);
     }
 
     KTestObject* user_buf = get_ktest_object_by_name(input, "user_buf");
@@ -158,8 +345,6 @@ int run_bpf_program_with_ktest_file(struct bpf_object *obj, int prog_fd, const c
 	
     memcpy(buf + sizeof(__u32), user_buf->bytes, user_buf->numBytes);
     memset(buf_out, 0, user_buf->numBytes + sizeof(__u32));
-
-    // fill_maps_with_pkt_values(obj, buf + sizeof(__u32), input);
 
     KTestObject* ingress_ifindex = get_ktest_object_by_name(input, "ingress_ifindex");
     if (!ingress_ifindex) {
@@ -193,7 +378,7 @@ int run_bpf_program_with_ktest_file(struct bpf_object *obj, int prog_fd, const c
         goto end;
     }
 
-    log_debug("Return code for the BPF program is: %d\n", topts.retval);
+    log_debug("Return code for the BPF program is: %d", topts.retval);
     
     log_debug("Let's now compare the output buffer with the expected output buffer.");
     ret = memcmp(buf, buf_out, user_buf->numBytes + sizeof(__u32));
@@ -310,23 +495,80 @@ end:
     return ret_code;
 }
 
-int main(int argc, const char **argv) {
-    const char *bpf_file = NULL;
-    const char *ktest_file = NULL;
-    const char *input_dir = NULL;
-    char *res_dir = NULL;
-
+int run_test(const char *ktest_file_name) {
     struct bpf_program *prog;
 	struct bpf_object *obj;
     int prog_fd;
+    int ret = 0;
+    char* ktest_file_in_dir = NULL;
 
+    obj = bpf_object__open(bpf_file);
+    if (libbpf_get_error(obj)) {
+        log_error("ERROR: failed to open BPF object file %s", bpf_file);
+        return -1;
+    }
+
+    log_debug("BPF object opened, let's now get the program.");
+
+    prog = bpf_object__next_program(obj, NULL);
+    if (bpf_object__load(obj)) {
+        log_error("ERROR: failed to load BPF object file %s", bpf_file);
+        ret = -1;
+        goto out;
+    }
+
+    prog_fd = bpf_program__fd(prog);
+
+    /* Extract only file name, without extension */
+    if (input_map_dir) {
+        if (fill_maps_with_correct_values(obj, prog_fd, ktest_file_name, input_map_dir) != 0) {
+            log_error("ERROR: failed to fill maps with correct values");
+            ret = -1;
+            goto out;
+        }
+    }
+
+    /* Check if we can open the file from the ktest_file_name */
+    if (access(ktest_file_name, F_OK) == -1) {
+        ktest_file_in_dir = malloc(strlen(input_dir) + strlen(ktest_file_name) + 2);
+        strcpy(ktest_file_in_dir, input_dir);
+        strcat(ktest_file_in_dir, "/");
+        strcat(ktest_file_in_dir, ktest_file_name);
+    } else {
+        ktest_file_in_dir = strdup(ktest_file_name);
+    }
+
+    log_debug("Let's now run the BPF program against the Ktest file %s", ktest_file_in_dir);
+
+    // Run BPF program against ktestfile
+    if (run_bpf_program_with_ktest_file(obj, prog_fd, ktest_file_in_dir, res_dir, prog) != 0) {
+        ret = -1;
+        goto out;
+    }
+
+out:
+    free(ktest_file_in_dir);
+    bpf_object__close(obj);
+
+    return ret;
+}
+
+int compare_strings(const void *a, const void *b) {
+    return strcmp(*(const char **)a, *(const char **)b);
+}
+
+int main(int argc, const char **argv) {
+    const char *log_file = NULL;
+    FILE *log_fp = NULL;
     struct argparse_option options[] = {
         OPT_HELP(),
         OPT_GROUP("Basic options"),
         OPT_STRING('b', "bpf_file", &bpf_file, "BPF object file", NULL, 0, 0),
         OPT_STRING('k', "ktest_file", &ktest_file, "KLEE Ktest file", NULL, 0, 0),
         OPT_STRING('i', "input_dir", &input_dir, "Dir with a list of KLEE Ktest files", NULL, 0, 0),
-        OPT_STRING('d', "res_dir", &res_dir, "Save results into this directory (default 'test')", NULL, 0, 0),
+        OPT_STRING('m', "input_map_dir", &input_map_dir, "Directory with the list of .json files with the input map values", NULL, 0, 0),
+        OPT_STRING('d', "res_dir", &res_dir, "Save results into this directory", NULL, 0, 0),
+        OPT_STRING('l', "log_file", &log_file, "Log file", NULL, 0, 0),
         OPT_END(),
     };
 
@@ -336,6 +578,18 @@ int main(int argc, const char **argv) {
         "If the program is equivalent, it will return 0. Otherwise, it will return 1.");
 
     argc = argparse_parse(&argparse, argc, argv);
+
+    log_set_level(LOG_TRACE);
+
+    if (log_file != NULL) {
+        FILE *log_fp = fopen(log_file, "w");
+        if (log_fp == NULL) {
+            log_error("ERROR: failed to open log file %s", log_file);
+            exit(1);
+        }
+
+        log_add_fp(log_fp, LOG_TRACE);
+    }
 
     if (bpf_file == NULL) {
         log_error("Please specify a BPF object file.");
@@ -347,30 +601,16 @@ int main(int argc, const char **argv) {
         exit(1);
     }
 
+    if (input_map_dir == NULL) {
+        log_warn("You didn't specify any directory with the input map values. The maps will be filled with default values (0).");
+    }
+
     if (res_dir == NULL) {
-        log_warn("Directory not specified, using 'test' as default.");
-        res_dir = malloc(5);
-        strcpy(res_dir, "test");
+        log_error("Please specify a directory to save the results.");
+        exit(1);
     }
 
     libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
-
-    obj = bpf_object__open(bpf_file);
-	if (libbpf_get_error(obj))
-		exit(1);
-
-    log_debug("BPF object opened, let's now get the program.");
-
-    prog = bpf_object__next_program(obj, NULL);
-	if (bpf_object__load(obj))
-		goto out;
-
-	prog_fd = bpf_program__fd(prog);
-
-    if (fill_maps_with_correct_values(obj) != 0) {
-        log_error("Error: failed to fill maps with correct values.");
-        goto out;
-    }
 
     // Get all files from the input directory
     if (input_dir != NULL) {
@@ -378,32 +618,44 @@ int main(int argc, const char **argv) {
         struct dirent *dir;
         d = opendir(input_dir);
         if (d) {
+            char *file_list[1024];
+            int file_count = 0;
+
             while ((dir = readdir(d)) != NULL) {
                 if (dir->d_type == DT_REG) {
                     if (strstr(dir->d_name, ".ktest") != NULL) {
-                        log_debug("Found Ktest file: %s", dir->d_name);
-                        char* ktest_file_in_dir = malloc(strlen(input_dir) + strlen(dir->d_name) + 2);
-                        strcpy(ktest_file_in_dir, input_dir);
-                        strcat(ktest_file_in_dir, "/");
-                        strcat(ktest_file_in_dir, dir->d_name);
-                        // Run BPF program against ktestfile
-                        run_bpf_program_with_ktest_file(obj, prog_fd, ktest_file_in_dir, res_dir, prog);
-                        free(ktest_file_in_dir);
+                        file_list[file_count] = strdup(dir->d_name);
+                        file_count++;
                     }
                 }
             }
+
+            // Sort the file names alphabetically
+            qsort(file_list, file_count, sizeof(char *), compare_strings);
+
+            for (int i = 0; i < file_count; ++i) {
+                log_debug("Found Ktest file: %s", file_list[i]);
+
+                if (run_test(file_list[i]) != 0) {
+                    log_error("ERROR: failed to run BPF program against Ktest file %s", file_list[i]);
+                }
+                
+                // Free the duplicated string
+                free(file_list[i]);
+            }
+            
             closedir(d);
         }
     } else {
         // Run BPF program against ktestfile
-        run_bpf_program_with_ktest_file(obj, prog_fd, ktest_file, res_dir, prog);
+        if (run_test(ktest_file) != 0) {
+            log_error("ERROR: failed to run BPF program against Ktest file %s", ktest_file);
+        }
     }
 
-out:
-    if (res_dir) {
-        free(res_dir);
+    if (log_fp != NULL) {
+        fclose(log_fp);
     }
-	bpf_object__close(obj);
 
     return 0;
 }

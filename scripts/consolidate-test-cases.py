@@ -270,8 +270,10 @@ def main():
                 if lookup not in map_results_dict[map_name]:
                     map_results_dict[map_name][lookup] = dict()
 
-                map_results_dict[map_name][lookup]['key'] = str(key_val)
-                map_results_dict[map_name][lookup]['key_size'] = len(bytes.fromhex(key_val[2:]))
+                bin_key = bytes.fromhex(key_val[2:])
+
+                map_results_dict[map_name][lookup]['key'] = binascii.hexlify(bin_key).decode('ascii')
+                map_results_dict[map_name][lookup]['key_size'] = len(bin_key)
                 map_results_dict[map_name][lookup]['value'] = binascii.hexlify(data).decode('ascii')
                 map_results_dict[map_name][lookup]['value_size'] = len(data)
 
