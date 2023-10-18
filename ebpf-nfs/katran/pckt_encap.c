@@ -60,8 +60,8 @@ int main(int argc, char **argv) {
     cval->mac[i] = 42;
   struct packet_description* pkt_des = malloc(sizeof(struct packet_description));
   struct real_definition *dst = malloc(sizeof(struct real_definition));
-  memset(pkt_des,0,sizeof(struct packet_description));
-  memset(dst,0,sizeof(struct real_definition));
+  katran_memset(pkt_des,0,sizeof(struct packet_description));
+  katran_memset(dst,0,sizeof(struct real_definition));
 
   if (pckt_encap_isolated(&test,cval,is_ipv6,pkt_des,dst,50))
     return 1;

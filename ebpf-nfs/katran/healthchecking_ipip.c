@@ -146,7 +146,7 @@ int healthchecker(struct __sk_buff *skb)
   if (real->flags == V6DADDR) {
     // the dst is v6.
     tun_flag = BPF_F_TUNINFO_IPV6;
-    memcpy(tkey.remote_ipv6, real->v6daddr, 16);
+    katran_memcpy(tkey.remote_ipv6, real->v6daddr, 16);
     ifindex = *v6_intf_ifindex;
   } else {
     // the dst is v4

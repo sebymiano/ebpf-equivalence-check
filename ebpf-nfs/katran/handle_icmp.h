@@ -40,9 +40,9 @@ static inline int swap_mac_and_send(void *data, void *data_end) {
   struct eth_hdr *eth;
   unsigned char tmp_mac[ETH_ALEN];
   eth = data;
-  memcpy(tmp_mac, eth->eth_source, ETH_ALEN);
-  memcpy(eth->eth_source, eth->eth_dest , ETH_ALEN);
-  memcpy(eth->eth_dest, tmp_mac, ETH_ALEN);
+  katran_memcpy(tmp_mac, eth->eth_source, ETH_ALEN);
+  katran_memcpy(eth->eth_source, eth->eth_dest , ETH_ALEN);
+  katran_memcpy(eth->eth_dest, tmp_mac, ETH_ALEN);
   return XDP_TX;
 }
 
@@ -50,8 +50,8 @@ __attribute__((__always_inline__))
 static inline void swap_mac(void *data, struct eth_hdr *orig_eth) {
   struct eth_hdr *eth;
   eth = data;
-  memcpy(eth->eth_source, orig_eth->eth_dest , ETH_ALEN);
-  memcpy(eth->eth_dest, orig_eth->eth_source, ETH_ALEN);
+  katran_memcpy(eth->eth_source, orig_eth->eth_dest , ETH_ALEN);
+  katran_memcpy(eth->eth_dest, orig_eth->eth_source, ETH_ALEN);
   eth->eth_proto = orig_eth->eth_proto;
 }
 
@@ -106,9 +106,9 @@ static inline int send_icmp6_reply(void *data, void *data_end) {
   // checksum from ground up we will just adjust it.
   icmp_hdr->icmp6_cksum -= 0x0001;
   ip6h->hop_limit = DEFAULT_TTL;
-  memcpy(tmp_addr, ip6h->saddr.s6_addr32, 16);
-  memcpy(ip6h->saddr.s6_addr32, ip6h->daddr.s6_addr32, 16);
-  memcpy(ip6h->daddr.s6_addr32, tmp_addr, 16);
+  katran_memcpy(tmp_addr, ip6h->saddr.s6_addr32, 16);
+  katran_memcpy(ip6h->saddr.s6_addr32, ip6h->daddr.s6_addr32, 16);
+  katran_memcpy(ip6h->daddr.s6_addr32, tmp_addr, 16);
   return swap_mac_and_send(data, data_end);
 }
 
@@ -186,9 +186,9 @@ static inline int send_icmp6_too_big(struct xdp_md *xdp) {
   ip6h->nexthdr = IPPROTO_ICMPV6;
   ip6h->hop_limit = DEFAULT_TTL;
   ip6h->payload_len = bpf_htons(ICMP6_TOOBIG_PAYLOAD_SIZE);
-  memset(ip6h->flow_lbl, 0, sizeof(ip6h->flow_lbl));
-  memcpy(ip6h->daddr.s6_addr32, orig_ip6h->saddr.s6_addr32, 16);
-  memcpy(ip6h->saddr.s6_addr32, orig_ip6h->daddr.s6_addr32, 16);
+  katran_memset(ip6h->flow_lbl, 0, sizeof(ip6h->flow_lbl));
+  katran_memcpy(ip6h->daddr.s6_addr32, orig_ip6h->saddr.s6_addr32, 16);
+  katran_memcpy(ip6h->saddr.s6_addr32, orig_ip6h->daddr.s6_addr32, 16);
   icmp6_hdr->icmp6_type = ICMPV6_PKT_TOOBIG;
   icmp6_hdr->icmp6_code = 0;
   icmp6_hdr->icmp6_mtu = bpf_htonl(MAX_PCKT_SIZE-sizeof(struct eth_hdr));
@@ -247,8 +247,8 @@ static inline int parse_icmpv6(void *data, void *data_end, __u64 off,
   }
   pckt->flow.proto = ip6h->nexthdr;
   pckt->flags |= F_ICMP;
-  memcpy(pckt->flow.srcv6, ip6h->daddr.s6_addr32, 16);
-  memcpy(pckt->flow.dstv6, ip6h->saddr.s6_addr32, 16);
+  katran_memcpy(pckt->flow.srcv6, ip6h->daddr.s6_addr32, 16);
+  katran_memcpy(pckt->flow.dstv6, ip6h->saddr.s6_addr32, 16);
   return FURTHER_PROCESSING;
 }
 

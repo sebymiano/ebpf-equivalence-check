@@ -426,14 +426,28 @@ int run_bpf_program_with_ktest_file(struct bpf_object *obj, int prog_fd, const c
     json_object_object_add(root, "ret_val", ret_val);
 
     // Allocate memory for the hex string
-    char *hex_string = (char *)malloc(user_buf->numBytes * 2 + 1);
+    char *input_hex_string = (char *)malloc(user_buf->numBytes * 2 + 1);
 
     // Convert the byte array to a hex string
-    byte_array_to_hex_string((unsigned char *)buf_out + sizeof(__u32), user_buf->numBytes, hex_string);
+    byte_array_to_hex_string((unsigned char *)buf + sizeof(__u32), user_buf->numBytes, input_hex_string);
+
+    // Add the input buffer
+    json_object *input_buf = json_object_new_string(input_hex_string);
+    if (!input_buf) {
+        ret_code = -1;
+        goto end;
+    }
+    json_object_object_add(root, "input_buf", input_buf);
+
+    // Allocate memory for the hex string
+    char *output_hex_string = (char *)malloc(user_buf->numBytes * 2 + 1);
+
+    // Convert the byte array to a hex string
+    byte_array_to_hex_string((unsigned char *)buf_out + sizeof(__u32), user_buf->numBytes, output_hex_string);
 
     // Add the output buffer
     // json_object *output_buf = json_object_new_string_len(buf_out + sizeof(__u32), user_buf->numBytes);
-    json_object *output_buf = json_object_new_string(hex_string);
+    json_object *output_buf = json_object_new_string(output_hex_string);
     if (!output_buf) {
         ret_code = -1;
         goto end;
@@ -446,7 +460,8 @@ end:
     kTest_free(input);
     free(buf);
     free(buf_out);
-    free(hex_string);
+    free(input_hex_string);
+    free(output_hex_string);
     return ret_code;
 }
 

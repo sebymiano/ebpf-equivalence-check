@@ -117,8 +117,8 @@ int healthchecker(struct __sk_buff *skb)
   }
 
   ethh = (void*)(long)skb->data;
-  memcpy(ethh->h_source, esrc->mac, 6);
-  memcpy(ethh->h_dest, edst->mac, 6);
+  katran_memcpy(ethh->h_source, esrc->mac, 6);
+  katran_memcpy(ethh->h_dest, edst->mac, 6);
 
   prog_stats->pckts_processed += 1;
   return bpf_redirect(*intf_ifindex, REDIRECT_EGRESS);

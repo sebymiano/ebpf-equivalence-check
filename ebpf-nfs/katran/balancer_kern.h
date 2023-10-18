@@ -11,6 +11,14 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#ifdef KLEE_VERIFICATION
+#define katran_memcpy(...) memcpy(__VA_ARGS__)
+#define katran_memset(...) memset(__VA_ARGS__)
+#else 
+#define katran_memcpy(...) __builtin_memcpy(__VA_ARGS__)
+#define katran_memset(...) __builtin_memset(__VA_ARGS__)
+#endif
+
 #include "balancer_consts.h"
 #include "balancer_helpers.h"
 #include "balancer_structs.h"
@@ -84,7 +92,7 @@ get_packet_dst(struct real_definition **real, struct packet_description *pckt,
     if (is_ipv6) {
       struct v6_lpm_key lpm_key_v6 = {};
       lpm_key_v6.prefixlen = 128;
-      memcpy(lpm_key_v6.addr, pckt->flow.srcv6, 16);
+      katran_memcpy(lpm_key_v6.addr, pckt->flow.srcv6, 16);
       lpm_val = bpf_map_lookup_elem(&lpm_src_v6, &lpm_key_v6);
     } else {
       struct v4_lpm_key lpm_key_v4 = {};
@@ -115,7 +123,7 @@ get_packet_dst(struct real_definition **real, struct packet_description *pckt,
       // e.g. if packets has same dst port -> they will go to the same real.
       // usually VoIP related services.
       pckt->flow.port16[0] = pckt->flow.port16[1];
-      memset(pckt->flow.srcv6, 0, 16);
+      katran_memset(pckt->flow.srcv6, 0, 16);
     }
     hash = get_packet_hash(pckt, hash_16bytes) % RING_SIZE;
     key = RING_SIZE * (vip_info->vip_num) + hash;
@@ -165,7 +173,11 @@ connection_table_lookup(struct real_definition **real,
   return;
 }
 
+#ifdef KLEE_VERIFICATION
 __attribute__((noinline)) static inline int
+#else
+__attribute__((__always_inline__)) static inline int
+#endif
 process_l3_headers(struct packet_description *pckt, __u8 *protocol, __u64 off,
                    __u16 *pkt_bytes, void *data, void *data_end, bool is_ipv6) {
   __u64 iph_len;
@@ -197,8 +209,8 @@ process_l3_headers(struct packet_description *pckt, __u8 *protocol, __u64 off,
         return action;
       }
     } else {
-      memcpy(pckt->flow.srcv6, ip6h->saddr.s6_addr32, 16);
-      memcpy(pckt->flow.dstv6, ip6h->daddr.s6_addr32, 16);
+      katran_memcpy(pckt->flow.srcv6, ip6h->saddr.s6_addr32, 16);
+      katran_memcpy(pckt->flow.dstv6, ip6h->daddr.s6_addr32, 16);
     }
   } else {
     iph = data + off;
@@ -243,7 +255,7 @@ check_decap_dst(struct packet_description *pckt, bool is_ipv6, bool *pass) {
   struct lb_stats *data_stats;
 
   if (is_ipv6) {
-    memcpy(dst_addr.addrv6, pckt->flow.dstv6, 16);
+    katran_memcpy(dst_addr.addrv6, pckt->flow.dstv6, 16);
   } else {
     dst_addr.addr = pckt->flow.dst;
   }
@@ -457,7 +469,7 @@ process_packet(void *data, __u64 off, void *data_end, bool is_ipv6,
   }
 
   if (is_ipv6) {
-    memcpy(vip.vipv6, pckt.flow.dstv6, 16);
+    katran_memcpy(vip.vipv6, pckt.flow.dstv6, 16);
   } else {
     vip.vip = pckt.flow.dst;
   }
@@ -633,7 +645,7 @@ process_packet(void *data, __u64 off, void *data_end, bool is_ipv6,
   return XDP_TX;
 }
 
-SEC("xdp-balancer")
+SEC("xdp")
 __attribute__((noinline)) int balancer_ingress(struct xdp_md *ctx) {
   void *data = (void *)(long)ctx->data;
   void *data_end = (void *)(long)ctx->data_end;

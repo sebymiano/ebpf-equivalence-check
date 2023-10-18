@@ -66,8 +66,8 @@ __attribute__((__always_inline__)) static inline bool encap_v6(
   if (new_eth + 1 > data_end || old_eth + 1 > data_end || ip6h + 1 > data_end) {
     return false;
   }
-  memcpy(new_eth->eth_dest, cval->mac, 6);
-  memcpy(new_eth->eth_source, old_eth->eth_dest, 6);
+  katran_memcpy(new_eth->eth_dest, cval->mac, 6);
+  katran_memcpy(new_eth->eth_source, old_eth->eth_dest, 6);
   new_eth->eth_proto = BE_ETH_P_IPV6;
 
   if (is_ipv6) {
@@ -116,8 +116,8 @@ __attribute__((__always_inline__)) static inline bool encap_v4(
   if (new_eth + 1 > data_end || old_eth + 1 > data_end || iph + 1 > data_end) {
     return false;
   }
-  memcpy(new_eth->eth_dest, cval->mac, 6);
-  memcpy(new_eth->eth_source, old_eth->eth_dest, 6);
+  katran_memcpy(new_eth->eth_dest, cval->mac, 6);
+  katran_memcpy(new_eth->eth_source, old_eth->eth_dest, 6);
   new_eth->eth_proto = BE_ETH_P_IP;
 
   create_v4_hdr(
@@ -139,8 +139,8 @@ decap_v6(struct xdp_md* xdp, void** data, void** data_end, bool inner_v4) {
   struct eth_hdr* old_eth;
   old_eth = *data;
   new_eth = *data + sizeof(struct ipv6hdr);
-  memcpy(new_eth->eth_source, old_eth->eth_source, 6);
-  memcpy(new_eth->eth_dest, old_eth->eth_dest, 6);
+  katran_memcpy(new_eth->eth_source, old_eth->eth_source, 6);
+  katran_memcpy(new_eth->eth_dest, old_eth->eth_dest, 6);
   if (inner_v4) {
     new_eth->eth_proto = BE_ETH_P_IP;
   } else {
@@ -160,8 +160,8 @@ decap_v4(struct xdp_md* xdp, void** data, void** data_end) {
   struct eth_hdr* old_eth;
   old_eth = *data;
   new_eth = *data + sizeof(struct iphdr);
-  memcpy(new_eth->eth_source, old_eth->eth_source, 6);
-  memcpy(new_eth->eth_dest, old_eth->eth_dest, 6);
+  katran_memcpy(new_eth->eth_source, old_eth->eth_source, 6);
+  katran_memcpy(new_eth->eth_dest, old_eth->eth_dest, 6);
   new_eth->eth_proto = BE_ETH_P_IP;
   if (bpf_xdp_adjust_head(xdp, (int)sizeof(struct iphdr))) {
     return false;
@@ -212,8 +212,8 @@ static inline bool gue_encap_v4(struct xdp_md *xdp, struct ctl_value *cval,
       udph + 1 > data_end) {
     return false;
   }
-  memcpy(new_eth->eth_dest, cval->mac, sizeof(new_eth->eth_dest));
-  memcpy(new_eth->eth_source, old_eth->eth_dest, sizeof(new_eth->eth_source));
+  katran_memcpy(new_eth->eth_dest, cval->mac, sizeof(new_eth->eth_dest));
+  katran_memcpy(new_eth->eth_source, old_eth->eth_dest, sizeof(new_eth->eth_source));
   new_eth->eth_proto = BE_ETH_P_IP;
 
   create_udp_hdr(
@@ -269,8 +269,8 @@ static inline bool gue_encap_v6(struct xdp_md *xdp, struct ctl_value *cval,
       udph + 1 > data_end) {
     return false;
   }
-  memcpy(new_eth->eth_dest, cval->mac, 6);
-  memcpy(new_eth->eth_source, old_eth->eth_dest, 6);
+  katran_memcpy(new_eth->eth_dest, cval->mac, 6);
+  katran_memcpy(new_eth->eth_source, old_eth->eth_dest, 6);
   new_eth->eth_proto = BE_ETH_P_IPV6;
 
 
@@ -304,8 +304,8 @@ gue_decap_v4(struct xdp_md* xdp, void** data, void** data_end) {
   struct eth_hdr* old_eth;
   old_eth = *data;
   new_eth = *data + sizeof(struct iphdr) + sizeof(struct udphdr);
-  memcpy(new_eth->eth_source, old_eth->eth_source, 6);
-  memcpy(new_eth->eth_dest, old_eth->eth_dest, 6);
+  katran_memcpy(new_eth->eth_source, old_eth->eth_source, 6);
+  katran_memcpy(new_eth->eth_dest, old_eth->eth_dest, 6);
   new_eth->eth_proto = BE_ETH_P_IP;
   if (bpf_xdp_adjust_head(
           xdp, (int)(sizeof(struct iphdr) + sizeof(struct udphdr)))) {
@@ -322,8 +322,8 @@ gue_decap_v6(struct xdp_md* xdp, void** data, void** data_end, bool inner_v4) {
   struct eth_hdr* old_eth;
   old_eth = *data;
   new_eth = *data + sizeof(struct ipv6hdr) + sizeof(struct udphdr);
-  memcpy(new_eth->eth_source, old_eth->eth_source, 6);
-  memcpy(new_eth->eth_dest, old_eth->eth_dest, 6);
+  katran_memcpy(new_eth->eth_source, old_eth->eth_source, 6);
+  katran_memcpy(new_eth->eth_dest, old_eth->eth_dest, 6);
   if (inner_v4) {
     new_eth->eth_proto = BE_ETH_P_IP;
   } else {

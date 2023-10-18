@@ -62,7 +62,7 @@ __attribute__((__always_inline__)) static inline void create_v6_hdr(
     __u16 payload_len,
     __u8 proto) {
   ip6h->version = 6;
-  memset(ip6h->flow_lbl, 0, sizeof(ip6h->flow_lbl));
+  katran_memset(ip6h->flow_lbl, 0, sizeof(ip6h->flow_lbl));
 #ifdef COPY_INNER_PACKET_TOS
   ip6h->priority = (tc & 0xF0) >> 4;
   ip6h->flow_lbl[0] = (tc & 0x0F) << 4;
@@ -72,8 +72,8 @@ __attribute__((__always_inline__)) static inline void create_v6_hdr(
   ip6h->nexthdr = proto;
   ip6h->payload_len = bpf_htons(payload_len);
   ip6h->hop_limit = DEFAULT_TTL;
-  memcpy(ip6h->saddr.s6_addr32, saddr, 16);
-  memcpy(ip6h->daddr.s6_addr32, daddr, 16);
+  katran_memcpy(ip6h->saddr.s6_addr32, saddr, 16);
+  katran_memcpy(ip6h->daddr.s6_addr32, daddr, 16);
 }
 
 __attribute__((__always_inline__))
