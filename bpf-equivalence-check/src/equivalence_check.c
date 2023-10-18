@@ -33,11 +33,16 @@
 #define A_PORT  6
 #define B_PORT 7
 
+#ifndef BPFTOOL_PATH
+#define BPFTOOL_PATH "/usr/sbin/bpftool"
+#endif
+
 const char *bpf_file = NULL;
 const char *ktest_file = NULL;
 const char *input_dir = NULL;
 const char *input_map_dir = NULL;
 const char *res_dir = NULL;
+const char *bpf_tool = BPFTOOL_PATH;
 
 struct packet {
   struct ethhdr ether;
@@ -106,7 +111,7 @@ char *get_json_file_from_dir(const char *input_map_dir, const char *filename) {
     return NULL;
 }
 
-int fill_maps_with_correct_values(struct bpf_object *obj, int prog_fd, const char *ktest_file_name, const char *input_map_dir) {
+int fill_maps_with_correct_values(struct bpf_object *obj, int prog_fd, const char *ktest_file_name, const char *input_map_dir, char ***map_names, int *map_names_count) {
     /* Get basename from path */
     const char *ktest_file_basename = get_filename_from_path(ktest_file_name);
 
@@ -115,8 +120,7 @@ int fill_maps_with_correct_values(struct bpf_object *obj, int prog_fd, const cha
 
     /* Remove extension from filename */
     char *dot = strrchr(filename, '.');
-    if (dot)
-        *dot = '\0';
+    if (dot) *dot = '\0';
 
     /* Add json extension to filename */
     char *json_filename = malloc(strlen(filename) + strlen(".json") + 1);
@@ -143,8 +147,17 @@ int fill_maps_with_correct_values(struct bpf_object *obj, int prog_fd, const cha
         return -1;
     }
 
+    *map_names_count = json_object_object_length(root);
+    *map_names = malloc(*map_names_count * sizeof(char *));
+    if (*map_names == NULL) {
+        log_error("ERROR: failed to allocate memory for map_names");
+        return -1;
+    }
+
+    int i = 0;
     json_object_object_foreach(root, map_name, val) {
         log_debug("Found key: %s", map_name);
+        (*map_names)[i++] = strdup(map_name);
 
         struct bpf_map *map = bpf_object__find_map_by_name(obj, map_name);
         if (map == NULL) {
@@ -298,7 +311,7 @@ int fill_maps_with_correct_values(struct bpf_object *obj, int prog_fd, const cha
     return 0;
 }
 
-int run_bpf_program_with_ktest_file(struct bpf_object *obj, int prog_fd, const char* ktest_file, const char *res_dir, const struct bpf_program *prog) {
+int run_bpf_program_with_ktest_file(struct bpf_object *obj, int prog_fd, const char* ktest_file, const struct bpf_program *prog, json_object *root) {
     KTest* input;
     int err, ret, ret_code = 0;
     char *buf, *buf_out;
@@ -386,38 +399,7 @@ int run_bpf_program_with_ktest_file(struct bpf_object *obj, int prog_fd, const c
         log_warn("ERROR: the output buffer is different from the expected output buffer.");
         // ret_code = -1;
         // goto end;
-    }
-
-    // Get filename from path
-    char *ktest_file_copy = strdup(ktest_file);
-    char *ktest_filename = basename(ktest_file_copy);
-
-    // Remove extension from filename
-    char *filename = strdup(ktest_filename);
-    free(ktest_file_copy);
-    char *dot = strrchr(filename, '.');
-    if (dot)
-        *dot = '\0';
-
-    // Add json extension to filename
-    char *json_filename = malloc(strlen(filename) + 5);
-    if (!json_filename) {
-        log_error("ERROR: failed to allocate memory for the JSON filename.");
-        free(filename);
-        ret_code = -1;
-        goto end;
-    }
-
-    strcpy(json_filename, filename);
-    strcat(json_filename, ".json");
-    free(filename);
-
-    // Create JSON file
-    json_object *root = json_object_new_object();
-    if (!root) {
-        ret_code = -1;
-        goto end;
-    }
+    } 
 
     // Add the name of the BPF program
     json_object *prog_name = json_object_new_string(bpf_program__name(prog));
@@ -458,41 +440,157 @@ int run_bpf_program_with_ktest_file(struct bpf_object *obj, int prog_fd, const c
     }
     json_object_object_add(root, "output_buf", output_buf);
 
-    char *final_filename = malloc(strlen(res_dir) + strlen(json_filename) + 2);
-    strcpy(final_filename, res_dir);
-    strcat(final_filename, "/");
-    strcat(final_filename, json_filename);
-
-    // Create path to the JSON file
-    char *json_dir = strdup(final_filename);
-    char *json_dirname = dirname(json_dir);
-    if (access(json_dirname, F_OK) == -1) {
-        if (mkdir(json_dirname, 0777) == -1) {
-            log_error("ERROR: failed to create directory %s", json_dirname);
-            ret_code = -1;
-            goto end;
-        }
-    }
-    free(json_dir);
-
-    // Save the JSON file
-    if (json_object_to_file_ext(final_filename, root, JSON_C_TO_STRING_PRETTY)) {
-        log_error("Error: failed to save %s!!", final_filename);
-        log_error("Error: %s", json_util_get_last_err());
-    } else {
-        log_info("%s saved", final_filename);
-    }
-
     ret_code = 0;
 
 end:
     kTest_free(input);
     free(buf);
     free(buf_out);
-    free(json_filename);
-    free(final_filename);
     free(hex_string);
     return ret_code;
+}
+
+int save_json_file(const char *ktest_file_name, const char *res_dir, json_object *root) {
+    /* Get basename from path */
+    const char *ktest_file_basename = get_filename_from_path(ktest_file_name);
+
+    /* Copy basename */
+    char *filename = strdup(ktest_file_basename);
+
+    /* Remove extension from filename */
+    char *dot = strrchr(filename, '.');
+    if (dot) *dot = '\0';
+
+    /* Add json extension to filename */
+    char *json_filename = malloc(strlen(filename) + strlen(".json") + 1);
+    strcpy(json_filename, filename);
+    strcat(json_filename, ".json");
+
+    log_trace("Output JSON filename: %s", json_filename);
+
+    free(filename);
+    
+    char *final_filename = malloc(strlen(res_dir) + strlen(json_filename) + 2);
+    strcpy(final_filename, res_dir);
+    strcat(final_filename, "/");
+    strcat(final_filename, json_filename);
+
+    log_debug("Final filename: %s", final_filename);
+
+    /* Create directory if it does not exist */
+    struct stat st = {0};
+    if (stat(res_dir, &st) == -1) {
+        mkdir(res_dir, 0700);
+    }
+
+    // Save the JSON file
+    if (json_object_to_file_ext(final_filename, root, JSON_C_TO_STRING_PRETTY)) {
+        log_error("Error: failed to save %s!!", final_filename);
+        log_error("Error: %s", json_util_get_last_err());
+        return -1;
+    } else {
+        log_info("%s saved", final_filename);
+    }
+
+    free(json_filename);
+    free(final_filename);
+
+    return 0;
+}
+
+int dump_maps(struct bpf_object *obj, const char **map_names, int map_names_count, const char *ktest_file_in_dir, const char *res_dir, json_object *root) {
+    int ret = 0;
+    const char *ktest_file_basename = get_filename_from_path(ktest_file_in_dir);
+
+    /* Copy basename */
+    char *filename = strdup(ktest_file_basename);
+
+    /* Remove extension from filename */
+    char *dot = strrchr(filename, '.');
+    if (dot) *dot = '\0';
+
+    /* In this case, we also dump the maps, so that we can compare them */
+    for (int i = 0; i < map_names_count; i++) {
+        const char *map_name = map_names[i];
+
+        log_debug("Dumping map %s", map_name);
+
+        struct bpf_map *map = bpf_object__find_map_by_name(obj, map_name);
+        if (map == NULL) {
+            log_error("ERROR: map %s not found!", map_name);
+            ret = -1;
+            goto end;
+        }
+
+        int map_fd = bpf_map__fd(map);
+
+        /* Get info about this BPF map */
+        struct bpf_map_info map_info = {};
+        uint32_t info_len = sizeof(map_info);
+
+        if (bpf_obj_get_info_by_fd(map_fd, &map_info, &info_len)) {
+            log_error("ERROR: failed to get info for map %s", map_name);
+            ret = -1;
+            goto end;
+        }
+
+        /* Dump this map using the bpftool command */
+        char *cmd = malloc(strlen(bpf_tool) + strlen(" map dump -j id ") + 10);
+        sprintf(cmd, "%s map dump -j -p id %d", bpf_tool, map_info.id);
+
+        // log_debug("Running command: %s", cmd);
+
+        /* Run command and redirect output to file */
+        char *map_dump_file = malloc(strlen(res_dir) + strlen(filename) + strlen(map_name) + strlen(".json") + 3);
+        strcpy(map_dump_file, res_dir);
+        strcat(map_dump_file, "/");
+        strcat(map_dump_file, filename);
+        strcat(map_dump_file, ".");
+        strcat(map_dump_file, map_name);
+        strcat(map_dump_file, ".json");
+
+        char *cmd_with_redirect = malloc(strlen(cmd) + strlen(" > ") + strlen(map_dump_file) + 1);
+        strcpy(cmd_with_redirect, cmd);
+        strcat(cmd_with_redirect, " > ");
+        strcat(cmd_with_redirect, map_dump_file);
+
+        log_debug("Running command: %s", cmd_with_redirect);
+
+        if (system(cmd_with_redirect) != 0) {
+            log_error("ERROR: failed to run command %s", cmd_with_redirect);
+            ret = -1;
+            goto cleanup;
+        }
+
+        json_object *map_dump = json_object_from_file(map_dump_file);
+        if (!map_dump) {
+            log_error("ERROR: failed to parse JSON file %s", map_dump_file);
+            ret = -1;
+            goto cleanup;
+        }
+
+        /* Remove file map_dump_file */
+        if (remove(map_dump_file) != 0) {
+            log_error("ERROR: failed to remove file %s", map_dump_file);
+            ret = -1;
+            goto cleanup;
+        }
+
+        /* Add the map dump to the root object */
+        json_object_object_add(root, map_name, map_dump);
+
+    cleanup:
+        free(cmd);
+        free(cmd_with_redirect);
+        free(map_dump_file);
+        if (ret < 0) {
+            goto end;
+        }
+    }
+
+end:
+    free(filename);
+    return ret;
 }
 
 int run_test(const char *ktest_file_name) {
@@ -519,9 +617,12 @@ int run_test(const char *ktest_file_name) {
 
     prog_fd = bpf_program__fd(prog);
 
+    char **map_names = NULL;
+    int map_names_count = 0;
+
     /* Extract only file name, without extension */
     if (input_map_dir) {
-        if (fill_maps_with_correct_values(obj, prog_fd, ktest_file_name, input_map_dir) != 0) {
+        if (fill_maps_with_correct_values(obj, prog_fd, ktest_file_name, input_map_dir, &map_names, &map_names_count) != 0) {
             log_error("ERROR: failed to fill maps with correct values");
             ret = -1;
             goto out;
@@ -540,8 +641,28 @@ int run_test(const char *ktest_file_name) {
 
     log_debug("Let's now run the BPF program against the Ktest file %s", ktest_file_in_dir);
 
-    // Run BPF program against ktestfile
-    if (run_bpf_program_with_ktest_file(obj, prog_fd, ktest_file_in_dir, res_dir, prog) != 0) {
+    /* Create JSON file */
+    json_object *root = json_object_new_object();
+    if (!root) {
+        ret = -1;
+        goto out;
+    }
+
+    /* Run BPF program against ktestfile */
+    if (run_bpf_program_with_ktest_file(obj, prog_fd, ktest_file_in_dir, prog, root) != 0) {
+        ret = -1;
+        goto out;
+    }
+
+    if (input_map_dir) {
+        if (dump_maps(obj, (const char **)map_names, map_names_count, ktest_file_in_dir, res_dir, root) != 0) {
+            ret = -1;
+            goto out;
+        }
+    }
+
+    /* Save JSON file */
+    if (save_json_file(ktest_file_in_dir, res_dir, root) != 0) {
         ret = -1;
         goto out;
     }
@@ -549,6 +670,14 @@ int run_test(const char *ktest_file_name) {
 out:
     free(ktest_file_in_dir);
     bpf_object__close(obj);
+    json_object_put(root);
+
+    if (map_names) {
+        for (int i = 0; i < map_names_count; i++) {
+            free(map_names[i]);
+        }
+        free(map_names);
+    }
 
     return ret;
 }
@@ -569,6 +698,7 @@ int main(int argc, const char **argv) {
         OPT_STRING('m', "input_map_dir", &input_map_dir, "Directory with the list of .json files with the input map values", NULL, 0, 0),
         OPT_STRING('d', "res_dir", &res_dir, "Save results into this directory", NULL, 0, 0),
         OPT_STRING('l', "log_file", &log_file, "Log file", NULL, 0, 0),
+        OPT_STRING('t', "bpf_tool", &bpf_tool, "Path to bpftool", NULL, 0, 0),
         OPT_END(),
     };
 
@@ -603,6 +733,16 @@ int main(int argc, const char **argv) {
 
     if (input_map_dir == NULL) {
         log_warn("You didn't specify any directory with the input map values. The maps will be filled with default values (0).");
+    }
+
+    if (input_map_dir) {
+        /* Let's check if the binary tool "bpftool" is available. 
+         * We need it to dump the maps. 
+         */
+        if (access(bpf_tool, X_OK) == -1) {
+            log_error("ERROR: bpftool not found. Please install it.");
+            exit(1);
+        }
     }
 
     if (res_dir == NULL) {

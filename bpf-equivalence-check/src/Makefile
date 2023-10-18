@@ -18,14 +18,14 @@ LIBJSON_OBJ := $(abspath $(OUTPUT)/libjson/lib/libjson-c.a)
 LIBJSON_HDR := $(abspath $(OUTPUT)/libjson/include/)
 BPFTOOL_OUTPUT ?= $(abspath $(OUTPUT)/bpftool)
 LIBJSON_OUTPUT ?= $(abspath $(OUTPUT)/libjson)
-BPFTOOL ?= $(BPFTOOL_OUTPUT)/bootstrap/bpftool
+BPFTOOL ?= $(BPFTOOL_OUTPUT)/bpftool
 ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' | sed 's/ppc64le/powerpc/' | sed 's/mips.*/mips/')
 # Use our own libbpf API headers and Linux UAPI headers distributed with
 # libbpf to avoid dependency on system-wide headers, which could be missing or
 # outdated
 # INCLUDES := -I$(OUTPUT) -I../libbpf/include/uapi -I$(OUTPUT)/libxdp/include -I$(LIBARGPARSE_SRC) -I$(dir $(VMLINUX))
 INCLUDES := -I$(OUTPUT) -I../libbpf/include/uapi -I$(LIBARGPARSE_SRC) -I$(LIBLOG_HDR) -I$(LIBJSON_HDR)
-CFLAGS := -g -Wall -DLOG_USE_COLOR
+CFLAGS := -g -Wall -DLOG_USE_COLOR -DBPFTOOL_PATH=\"$(BPFTOOL)\"
 ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS) 
 
 APPS = equivalence_check
@@ -102,7 +102,7 @@ $(LIBBPF_OBJ): $(wildcard $(LIBBPF_SRC)/*.[ch] $(LIBBPF_SRC)/Makefile) | $(OUTPU
 # Build bpftool
 $(BPFTOOL): | $(BPFTOOL_OUTPUT)
 	$(call msg,BPFTOOL,$@)
-	$(Q)$(MAKE) ARCH= CROSS_COMPILE= OUTPUT=$(BPFTOOL_OUTPUT)/ -C $(BPFTOOL_SRC) bootstrap
+	$(Q)$(MAKE) ARCH= CROSS_COMPILE= OUTPUT=$(BPFTOOL_OUTPUT)/ -C $(BPFTOOL_SRC)
 
 # Build bpftool
 $(LIBARGPARSE_OBJ):
