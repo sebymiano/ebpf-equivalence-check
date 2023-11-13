@@ -649,7 +649,7 @@ SEC("xdp")
 __attribute__((noinline)) int balancer_ingress(struct xdp_md *ctx) {
   void *data = (void *)(long)ctx->data;
   void *data_end = (void *)(long)ctx->data_end;
-  struct eth_hdr *eth = data;
+  struct eth_hdr *eth = (struct eth_hdr *)data;
   __u32 eth_proto;
   __u32 nh_off;
   nh_off = sizeof(struct eth_hdr);
