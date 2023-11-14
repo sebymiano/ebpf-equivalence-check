@@ -52,8 +52,6 @@ if [ -z "$input_dir" ] || [ -z "$output_dir" ]; then
   exit 1
 fi
 
-output_dir="${DIR}/${output_dir}"
-
 rm -rf "$output_dir"
 # Create output directory if it doesn't exist
 if [ ! -d "$output_dir" ]; then

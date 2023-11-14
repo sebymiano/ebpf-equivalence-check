@@ -41,39 +41,53 @@ def create_tar_archive(source_dir, archive_name):
     with tarfile.open(archive_name, "w") as tar:
         tar.add(source_dir, arcname=os.path.basename(source_dir))
     
-def generate_test_cases(prog_dir, output_dir):
+def generate_test_cases(prog_dir, container_output_dir, local_output_dir):
+    volume_mapping = {
+        sys.path[0]: {
+            'bind': '/pix/scripts',
+            'mode': 'rw'
+        },
+    }
     # Start a detached container
-    container = docker_client.containers.run(docker_image, "tail -f /dev/null", detach=True)
+    container = docker_client.containers.run(docker_image, "tail -f /dev/null", detach=True, volumes=volume_mapping)
 
     archive_name = "progA.tar"
     create_tar_archive(prog_dir, archive_name)
 
+    prog_dir_basename = os.path.basename(os.path.normpath(prog_dir))
+
+    # Before copying the archive to the container, I need to create the directory inside the container
+    container.exec_run(f"mkdir -p /pix/ebpf-nfs/{prog_dir_basename}")
+
     # Copy the archive to the container and then extract it
     with open(archive_name, 'rb') as archive:
         logger.debug(f"Copying {archive_name} to container")
-        container.put_archive('/pix/ebpf-nfs', archive.read())
+        container.put_archive(f'/pix/ebpf-nfs/{prog_dir_basename}', archive.read())
 
     os.remove(archive_name)
 
     try:
-        cmd = f"cd /pix/scripts && {GENERATE_TEST_CASE_SCRIPT} -d /pix/ebpf-nfs/{os.path.basename(prog_dir)} -o /pix/{os.path.basename(output_dir)}"
-        response = container.exec_run(cmd, stdout=True, stderr=True, stream=True)
+        cmd = f"/pix/scripts/{GENERATE_TEST_CASE_SCRIPT} -d /pix/ebpf-nfs/{prog_dir_basename} -o /pix/{container_output_dir}"
+        logger.info(f"Running {cmd}")
+        logger.info(f"This will take a while... (it depends on the size of the program)")
+        response = container.exec_run(cmd, stdout=True, stderr=True)
 
-        logger.debug(f"Running {cmd}:\n{response.output.decode()}")
+        # logger.debug(f"Cmd returned :\n{response.output.decode()}")
+        logger.info("Test cases for program generated")
 
         # Let's retrieve the result from the container
         logger.debug("Retrieving result from container")
-        stream, stat = container.get_archive(f'/pix/{os.path.basename(output_dir)}')
+        stream, _ = container.get_archive(f'/pix/{container_output_dir}')
 
-        with open(f"{output_dir}.tar", 'wb') as out_file:
+        with open(f"{container_output_dir}.tar", 'wb') as out_file:
             for chunk in stream:
                 out_file.write(chunk)
         
         # Extract the tar archive
-        with tarfile.open(f"{output_dir}.tar", 'r') as tar:
-            tar.extractall(path=output_dir)
+        with tarfile.open(f"{container_output_dir}.tar", 'r') as tar:
+            tar.extractall(path=local_output_dir)
 
-        os.remove(f"{output_dir}.tar")  # Clean up the tar file
+        os.remove(f"{container_output_dir}.tar")  # Clean up the tar file
 
     finally:
         # Stop and remove the container
@@ -150,7 +164,7 @@ def check_equivalence(progA_output_dir, progA_file, progB_output_dir, progB_file
         logger.error('The two programs are not equivalent')
         return False
         
-    progA_testB_folder = f"{sys.path[0]}/progA_testB"
+    progA_testB_folder = f"{output_dir}/progA_testB"
 
     # Create dst_folder if it does not exist
     if not os.path.isdir(progA_testB_folder):
@@ -160,7 +174,7 @@ def check_equivalence(progA_output_dir, progA_file, progB_output_dir, progB_file
     os.system(cmd_str)
 
     # Run the second program with the test cases of the first program
-    progB_testB_folder = f"{sys.path[0]}/progB_testB"
+    progB_testB_folder = f"{output_dir}/progB_testB"
 
     # Create dst_folder if it does not exist
     if not os.path.isdir(progB_testB_folder):
@@ -183,7 +197,7 @@ def check_equivalence(progA_output_dir, progA_file, progB_output_dir, progB_file
 
     # Sort the two lists
     progA_testB_files.sort()
-    progB_testB_folder.sort()
+    progB_testB_files.sort()
 
     # for every file I want to append the absolute path to the file name
     for i in range(len(progA_testB_files)):
@@ -202,16 +216,16 @@ def check_equivalence(progA_output_dir, progA_file, progB_output_dir, progB_file
     return equivalent
 
     
-def main(progA, progB, equivalence_bin):
+def main(progA, progB, equivalence_bin, output_dir):
     logger.debug('Starting equivalence check')
 
-    progA_output_dir = f"{sys.path[0]}/progA_test_cases"
-    progB_output_dir = f"{sys.path[0]}/progB_test_cases"
+    progA_output_dir = "progA_test_cases"
+    progB_output_dir = "progB_test_cases"
 
-    generate_test_cases(progA, progA_output_dir)
-    generate_test_cases(progB, progB_output_dir)
+    generate_test_cases(progA, progA_output_dir, output_dir)
+    generate_test_cases(progB, progB_output_dir, output_dir)
 
-    logger.info(f"Compiling original programs for {progA}")
+    logger.info(f"Compiling original program A in {progA}")
     # Now that the test cases are generated, I need to compile the original program
     cmd = f"cd {progA} && make build-original"
     result = subprocess.run(cmd, shell=True, capture_output=True)
@@ -233,10 +247,10 @@ def main(progA, progB, equivalence_bin):
 
     # Copy file inside the progA_output_dir
     with open(f"{progA}/{progA_file}", 'rb') as progA_file_obj:
-        with open(f"{progA_output_dir}/{progA_file}", 'wb') as progA_output_file_obj:
+        with open(f"{output_dir}/{progA_output_dir}/{progA_file}", 'wb') as progA_output_file_obj:
             progA_output_file_obj.write(progA_file_obj.read())
     
-    logger.info(f"Compiling original programs for {progB}")
+    logger.info(f"Compiling original program B in {progB}")
     # Compile the original program for progB
     cmd = f"cd {progB} && make build-original"
     result = subprocess.run(cmd, shell=True, capture_output=True)
@@ -258,18 +272,18 @@ def main(progA, progB, equivalence_bin):
     
     # Copy file inside the progB_output_dir
     with open(f"{progB}/{progB_file}", 'rb') as progB_file_obj:
-        with open(f"{progB_output_dir}/{progB_file}", 'wb') as progB_output_file_obj:
+        with open(f"{output_dir}/{progB_output_dir}/{progB_file}", 'wb') as progB_output_file_obj:
             progB_output_file_obj.write(progB_file_obj.read())
     
     # Run the equivalence check binary
     logger.info("Running equivalence check binary")
 
-    equivalence = check_equivalence(progA_output_dir, progA_file, progB_output_dir, progB_file, equivalence_bin)
+    equivalence = check_equivalence(os.path.join(output_dir, progA_output_dir), progA_file, os.path.join(output_dir, progB_output_dir), progB_file, equivalence_bin, output_dir)
     
     if equivalence:
         logger.info("The two programs are equivalent")
     else:
-        logger.info("The two programs are not equivalent")
+        logger.error("The two programs are not equivalent")
 
 if __name__ == '__main__':
     logger = logging.getLogger("Equivalence Checker")
@@ -290,6 +304,7 @@ if __name__ == '__main__':
     parser.add_argument('progB', metavar='PROG_B_FOLDER', type=str, help='path to folder of second BPF program')
     parser.add_argument('--docker-image', type=str, required=False, default="sebymiano/pix-klee:latest", help='name of the docker image to use')
     parser.add_argument('-b', '--equivalence-bin', type=str, default="equivalence_check", help='path to equivalence check binary')
+    parser.add_argument('-o', '--output-dir', type=str, default="output", help='path to output directory')
     args = parser.parse_args()
 
     docker_image = args.docker_image
@@ -320,4 +335,12 @@ if __name__ == '__main__':
         logger.error("Docker container is not available")
         sys.exit(1)
 
-    main(args.progA, args.progB, args.equivalence_bin)
+    # Check if the output directory exists
+    if os.path.isdir(args.output_dir):
+        logger.warning(f"Output directory {args.output_dir} already exists, it will be overwritten")
+        # remove it
+        os.system(f"rm -rf {args.output_dir}")
+    else:
+        os.makedirs(args.output_dir)
+
+    main(args.progA, args.progB, args.equivalence_bin, args.output_dir)
