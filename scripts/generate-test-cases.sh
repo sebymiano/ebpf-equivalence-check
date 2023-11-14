@@ -18,10 +18,17 @@ usage() {
   echo "  -h  Show this help message"
 }
 
+cleanup() {
+  usage
+  exit 1
+}
+
 # Initialize variables
 input_dir=""
 output_dir=""
 binary=""
+
+trap 'cleanup' ERR
 
 # Parse command line options
 while getopts "d:o:b:h" opt; do

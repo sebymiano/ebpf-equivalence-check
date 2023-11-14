@@ -57,27 +57,31 @@ def generate_test_cases(prog_dir, container_output_dir, local_output_dir):
     prog_dir_basename = os.path.basename(os.path.normpath(prog_dir))
 
     # Before copying the archive to the container, I need to create the directory inside the container
-    container.exec_run(f"mkdir -p /pix/ebpf-nfs/{prog_dir_basename}")
+    # container.exec_run(f"mkdir -p {os.path.join('/pix/ebpf-nfs', prog_dir_basename)}")
 
     # Copy the archive to the container and then extract it
     with open(archive_name, 'rb') as archive:
         logger.debug(f"Copying {archive_name} to container")
-        container.put_archive(f'/pix/ebpf-nfs/{prog_dir_basename}', archive.read())
+        container.put_archive(f"/pix/ebpf-nfs", archive.read())
 
     os.remove(archive_name)
 
     try:
-        cmd = f"/pix/scripts/{GENERATE_TEST_CASE_SCRIPT} -d /pix/ebpf-nfs/{prog_dir_basename} -o /pix/{container_output_dir}"
+        cmd = f"{os.path.join('/pix/scripts/', GENERATE_TEST_CASE_SCRIPT)} -d {os.path.join('/pix/ebpf-nfs/', prog_dir_basename)} -o {os.path.join('/pix', container_output_dir)}"
         logger.info(f"Running {cmd}")
         logger.info(f"This will take a while... (it depends on the size of the program)")
         response = container.exec_run(cmd, stdout=True, stderr=True)
 
-        # logger.debug(f"Cmd returned :\n{response.output.decode()}")
+        if response.exit_code != 0:
+            logger.error(f"Failed to generate test cases: {response.output.decode()}")
+            sys.exit(1)
+
+        logger.debug(f"Cmd returned :\n{response.output.decode()}")
         logger.info("Test cases for program generated")
 
         # Let's retrieve the result from the container
         logger.debug("Retrieving result from container")
-        stream, _ = container.get_archive(f'/pix/{container_output_dir}')
+        stream, _ = container.get_archive(os.path.join('/pix', container_output_dir))
 
         with open(f"{container_output_dir}.tar", 'wb') as out_file:
             for chunk in stream:
@@ -111,23 +115,23 @@ def check_equivalence(progA_output_dir, progA_file, progB_output_dir, progB_file
     # If the outputs are the same, then the programs are equivalent
     # If the outputs are different, then the programs are not equivalent
     equivalent = True
-    progA_testA_folder = f"{output_dir}/progA_testA"
+    progA_testA_folder = os.path.join(output_dir, "progA_testA")
 
     # Create dst_folder if it does not exist
     if not os.path.isdir(progA_testA_folder):
         os.makedirs(progA_testA_folder)
 
-    cmd_str = f"{equivalence_bin} -b {progA_output_dir}/{progA_file} -i {progA_output_dir}/ktest-files/ -m {progA_output_dir}/map-results/ -d {progA_testA_folder}"
+    cmd_str = f"{equivalence_bin} -b {os.path.join(progA_output_dir, progA_file)} -i {os.path.join(progA_output_dir, 'ktest-files')} -m {os.path.join(progA_output_dir, 'map-results')} -d {progA_testA_folder}"
     os.system(cmd_str)
 
     # Run the second program with the test cases of the first program
-    progB_testA_folder = f"{output_dir}/progB_testA"
+    progB_testA_folder = os.path.join(output_dir, "progB_testA")
 
     # Create dst_folder if it does not exist
     if not os.path.isdir(progB_testA_folder):
         os.makedirs(progB_testA_folder)
 
-    cmd_str = f"{equivalence_bin} -b {progB_output_dir}/{progB_file} -i {progA_output_dir}/ktest-files/ -m {progA_output_dir}/map-results/ -d {progB_testA_folder}"
+    cmd_str = f"{equivalence_bin} -b {os.path.join(progB_output_dir, progB_file)} -i {os.path.join(progA_output_dir, 'ktest-files')} -m {os.path.join(progA_output_dir, 'map-results')} -d {progB_testA_folder}"
     os.system(cmd_str)
 
     # Compare the outputs of the two programs
@@ -148,39 +152,35 @@ def check_equivalence(progA_output_dir, progA_file, progB_output_dir, progB_file
 
     # for every file I want to append the absolute path to the file name
     for i in range(len(progA_testA_files)):
-        progA_testA_files[i] = f"{progA_testA_folder}/{progA_testA_files[i]}"
+        progA_testA_files[i] = os.path.join(progA_testA_folder, progA_testA_files[i])
 
     # for every file I want to append the absolute path to the file name
     for i in range(len(progB_testA_files)):
-        progB_testA_files[i] = f"{progB_testA_folder}/{progB_testA_files[i]}"
+        progB_testA_files[i] = os.path.join(progB_testA_folder, progB_testA_files[i])
 
     # Compare the two lists
     for i in range(len(progA_testA_files)):
         if not compare_json_files(progA_testA_files[i], progB_testA_files[i]):
             equivalent = False
             logger.debug(f"Test case {progA_testA_files[i]} is not equivalent to test case {progB_testA_files[i]}")
-
-    if not equivalent:
-        logger.error('The two programs are not equivalent')
-        return False
         
-    progA_testB_folder = f"{output_dir}/progA_testB"
+    progA_testB_folder = os.path.join(output_dir, "progA_testB")
 
     # Create dst_folder if it does not exist
     if not os.path.isdir(progA_testB_folder):
         os.makedirs(progA_testB_folder)
 
-    cmd_str = f"{equivalence_bin} -b {progA_output_dir}/{progA_file} -i {progB_output_dir}/ktest-files/ -m {progB_output_dir}/map-results/ -d {progA_testB_folder}"
+    cmd_str = f"{equivalence_bin} -b {os.path.join(progA_output_dir, progA_file)} -i {os.path.join(progB_output_dir, 'ktest-files')} -m {os.path.join(progB_output_dir, 'map-results')} -d {progA_testB_folder}"
     os.system(cmd_str)
 
     # Run the second program with the test cases of the first program
-    progB_testB_folder = f"{output_dir}/progB_testB"
+    progB_testB_folder = os.path.join(output_dir, "progB_testB")
 
     # Create dst_folder if it does not exist
     if not os.path.isdir(progB_testB_folder):
         os.makedirs(progB_testB_folder)
 
-    cmd_str = f"{equivalence_bin} -b {progB_output_dir}/{progB_file} -i {progB_output_dir}/ktest-files/ -m {progB_output_dir}/map-results/ -d {progB_testB_folder}"
+    cmd_str = f"{equivalence_bin} -b {os.path.join(progB_output_dir, progB_file)} -i {os.path.join(progB_output_dir, 'ktest-files')} -m {os.path.join(progB_output_dir, 'map-results')} -d {progB_testB_folder}"
     os.system(cmd_str)
 
     # Compare the outputs of the two programs
@@ -201,11 +201,11 @@ def check_equivalence(progA_output_dir, progA_file, progB_output_dir, progB_file
 
     # for every file I want to append the absolute path to the file name
     for i in range(len(progA_testB_files)):
-        progA_testB_files[i] = f"{progA_testB_folder}/{progA_testB_files[i]}"
+        progA_testB_files[i] = os.path.join(progA_testB_folder, progA_testB_files[i])
 
     # for every file I want to append the absolute path to the file name
     for i in range(len(progB_testB_files)):
-        progB_testB_files[i] = f"{progB_testB_folder}/{progB_testB_files[i]}"
+        progB_testB_files[i] = os.path.join(progB_testB_folder, progB_testB_files[i])
 
     # Compare the two lists
     for i in range(len(progA_testB_files)):
@@ -246,8 +246,8 @@ def main(progA, progB, equivalence_bin, output_dir):
         sys.exit(1)
 
     # Copy file inside the progA_output_dir
-    with open(f"{progA}/{progA_file}", 'rb') as progA_file_obj:
-        with open(f"{output_dir}/{progA_output_dir}/{progA_file}", 'wb') as progA_output_file_obj:
+    with open(f"{os.path.join(progA, progA_file)}", 'rb') as progA_file_obj:
+        with open(f"{os.path.join(output_dir, progA_output_dir, progA_file)}", 'wb') as progA_output_file_obj:
             progA_output_file_obj.write(progA_file_obj.read())
     
     logger.info(f"Compiling original program B in {progB}")
@@ -270,11 +270,11 @@ def main(progA, progB, equivalence_bin, output_dir):
         logger.error('No .bpf.o file found in second BPF program directory')
         sys.exit(1)
     
-    # Copy file inside the progB_output_dir
-    with open(f"{progB}/{progB_file}", 'rb') as progB_file_obj:
-        with open(f"{output_dir}/{progB_output_dir}/{progB_file}", 'wb') as progB_output_file_obj:
+    # Copy file inside the progB_output_dir    
+    with open(f"{os.path.join(progB, progB_file)}", 'rb') as progB_file_obj:
+        with open(f"{os.path.join(output_dir, progB_output_dir, progB_file)}", 'wb') as progB_output_file_obj:
             progB_output_file_obj.write(progB_file_obj.read())
-    
+
     # Run the equivalence check binary
     logger.info("Running equivalence check binary")
 
@@ -313,10 +313,14 @@ if __name__ == '__main__':
     if not os.path.isdir(args.progA):
         logger.error('Invalid path to first BPF program')
         sys.exit(1)
+    else:
+        args.progA = os.path.abspath(args.progA)
 
     if not os.path.isdir(args.progB):
         logger.error('Invalid path to second BPF program')
         sys.exit(1)
+    else:
+        args.progB = os.path.abspath(args.progB)
 
     # Run the equivalence check binary to see if it works using the subprocess module
     logger.info("Running equivalence check binary")
