@@ -76,7 +76,6 @@ def generate_test_cases(prog_dir, container_output_dir, local_output_dir):
             logger.error(f"Failed to generate test cases: {response.output.decode()}")
             sys.exit(1)
 
-        logger.debug(f"Cmd returned :\n{response.output.decode()}")
         logger.info("Test cases for program generated")
 
         # Let's retrieve the result from the container
@@ -92,6 +91,13 @@ def generate_test_cases(prog_dir, container_output_dir, local_output_dir):
             tar.extractall(path=local_output_dir)
 
         os.remove(f"{container_output_dir}.tar")  # Clean up the tar file
+
+        generated_files = os.listdir(os.path.join(local_output_dir, container_output_dir, "ktest-files"))
+
+        if len(generated_files) == 0:
+            logger.error("No test cases generated")
+            logger.debug(f"Cmd returned :\n{response.output.decode()}")
+            sys.exit(1)
 
     finally:
         # Stop and remove the container
