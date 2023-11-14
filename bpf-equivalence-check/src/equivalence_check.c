@@ -52,8 +52,8 @@ struct packet {
 } __attribute__((__packed__));
 
 static const char *const usages[] = {
-    "bpf_run_test [options] [[--] args]",
-    "bpf_run_test [options]",
+    "equivalence_check [options] [[--] args]",
+    "equivalence_check [options]",
     NULL,
 };
 

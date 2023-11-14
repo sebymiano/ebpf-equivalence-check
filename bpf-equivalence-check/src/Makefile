@@ -117,6 +117,7 @@ $(LIBLOG_OBJ):
 # Build libjson
 $(LIBJSON_OBJ):
 	$(call msg,LIBJSON,$@)
+	$(Q)mkdir -p $(LIBJSON_SRC)/build
 	$(Q)cmake -S $(LIBJSON_SRC) -B $(LIBJSON_SRC)/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$(LIBJSON_OUTPUT) -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DHAVE_ARC4RANDOM=OFF
 	$(Q)$(MAKE) -C $(LIBJSON_SRC)/build install
 
@@ -144,7 +145,7 @@ $(OUTPUT)/$(HELPERS_OBJ): | $(OUTPUT)
 	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $(patsubst $(OUTPUT)/%.o,%.c,$@) -o $@
 
 # Build application binary
-$(APPS): %: $(LIBJSON_OBJ) $(OUTPUT)/%.o $(OUTPUT)/$(HELPERS_OBJ) $(LIBBPF_OBJ) $(LIBARGPARSE_OBJ) $(LIBLOG_OBJ) | $(OUTPUT)
+$(APPS): %: $(OUTPUT)/%.o $(OUTPUT)/$(HELPERS_OBJ) $(LIBBPF_OBJ) $(LIBARGPARSE_OBJ) $(LIBLOG_OBJ) | $(OUTPUT) $(LIBJSON_OBJ)
 	$(call msg,BINARY,$@)
 	$(Q)$(CC) $(CFLAGS) $^ $(ALL_LDFLAGS) -lelf -lz -o $@
 

@@ -47,7 +47,7 @@ while getopts "d:o:b:h" opt; do
 done
 
 # Check if all parameters are specified
-if [ -z "$input_dir" ] || [ -z "$output_dir" ] || [ -z "$binary" ]; then
+if [ -z "$input_dir" ] || [ -z "$output_dir" ]; then
   usage
   exit 1
 fi
@@ -69,6 +69,12 @@ make build-tests
 
 echo -e "${COLOR_GREEN}Compiling test application${COLOR_OFF}"
 make build-replay-tests
+
+# check if $binary is specified
+if [ -z "$binary" ]; then
+  # search for a file that ends with .bin
+  binary=$(find . -name "*.bin" | head -n 1)
+fi
 
 echo -e "${COLOR_GREEN}Moving generated test cases to output directory: ${output_dir}${COLOR_OFF}"
 rm -rf "${output_dir}/ktest-files" > /dev/null 2>&1

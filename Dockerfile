@@ -257,7 +257,12 @@ ENV LD_LIBRARY_PATH=/usr/local/lib:/llvm/build/lib:/klee/build/lib/:$LD_LIBRARY_
 
 WORKDIR /pix
 
-# ADD ebpf-nfs/ /pix/ebpf-nfs
+ADD ebpf-nfs/common /pix/ebpf-nfs/common
+ADD ebpf-nfs/headers /pix/ebpf-nfs/headers
+ADD ebpf-nfs/libbpf-stubbed /pix/ebpf-nfs/libbpf-stubbed
+ADD ebpf-nfs/Makefile /pix/ebpf-nfs/Makefile
+
+ADD scripts /pix/scripts
 # ADD dpdk-nfs/ /pix/dpdk-nfs
 
 CMD ["/bin/bash"]

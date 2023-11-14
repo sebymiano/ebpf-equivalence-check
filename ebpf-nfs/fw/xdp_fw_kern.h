@@ -151,6 +151,7 @@ int xdp_fw_prog(struct xdp_md *ctx)
 	flow_key.ip_dst = ip->daddr;
 	flow_key.l4_src = l4->source;
 	flow_key.l4_dst = l4->dest;
+	// flow_key.l4_dst = l4->source;
 
 	biflow(&flow_key);
 
