@@ -8,6 +8,8 @@ from jycm.jycm import YouchamaJsonDiffer
 import docker
 import subprocess
 import tarfile
+from tqdm import tqdm
+import re
 
 import logging
 
@@ -70,11 +72,35 @@ def generate_test_cases(prog_dir, container_output_dir, local_output_dir):
         cmd = f"{os.path.join('/pix/scripts/', GENERATE_TEST_CASE_SCRIPT)} -d {os.path.join('/pix/ebpf-nfs/', prog_dir_basename)} -o {os.path.join('/pix', container_output_dir)}"
         logger.info(f"Running {cmd}")
         logger.info(f"This will take a while... (it depends on the size of the program)")
-        response = container.exec_run(cmd, stdout=True, stderr=True)
 
-        if response.exit_code != 0:
-            logger.error(f"Failed to generate test cases: {response.output.decode()}")
-            sys.exit(1)
+        # Start the exec instance
+        exec_instance = docker_client.api.exec_create(container.id, cmd, stdout=True, stderr=True)
+
+        # Start the exec and get a socket-like object for the output
+        output_stream = docker_client.api.exec_start(exec_instance, detach=False, stream=True)
+        
+        # Initialize the progress bar
+        progress_bar = tqdm(desc="Generated test cases", unit=" tests")
+
+        # Process the output stream
+        for chunk in output_stream:
+            output = chunk.decode('utf-8')
+            # Extract the test number
+            match = re.search(r'Added test number: (\d+)', output)
+            if match:
+                # Update the progress bar to the latest test number
+                latest_test_number = int(match.group(1))
+                progress_bar.n = latest_test_number
+                progress_bar.refresh()
+
+        # Close the progress bar
+        progress_bar.close()
+
+        # response = container.exec_run(cmd, stdout=True, stderr=True)
+
+        # if response.exit_code != 0:
+        #     logger.error(f"Failed to generate test cases: {response.output.decode()}")
+        #     sys.exit(1)
 
         logger.info("Test cases for program generated")
 

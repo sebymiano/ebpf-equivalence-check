@@ -63,7 +63,7 @@ echo -e "${COLOR_GREEN}Moving inside the input directory: ${input_dir}${COLOR_OF
 cd "${input_dir}"
 
 echo -e "${COLOR_GREEN}Generating test cases with KLEE${COLOR_OFF}"
-make build-tests
+stdbuf -oL -eL make build-tests
 
 echo -e "${COLOR_GREEN}Compiling test application${COLOR_OFF}"
 make build-replay-tests

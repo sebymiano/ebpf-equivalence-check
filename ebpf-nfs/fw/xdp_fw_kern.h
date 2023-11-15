@@ -88,8 +88,6 @@ int xdp_fw_prog(struct xdp_md *ctx)
 	struct flow_ctx_table_leaf new_flow = {0};
 	struct flow_ctx_table_key flow_key  = {0};
 	struct flow_ctx_table_leaf *flow_leaf;
-	// struct flow_ctx_table_leaf *flow_leaf = malloc(sizeof(struct flow_ctx_table_leaf));
-  	// klee_make_symbolic(flow_leaf, sizeof(struct flow_ctx_table_leaf), "flow_leaf");
 
 	struct ethhdr *ethernet;
 	struct iphdr        *ip;
@@ -156,28 +154,14 @@ int xdp_fw_prog(struct xdp_md *ctx)
 	biflow(&flow_key);
 
 	if (ingress_ifindex == B_PORT){
-		// struct flow_ctx_table_leaf *flow_leaf = (struct flow_ctx_table_leaf *)malloc(sizeof(struct flow_ctx_table_leaf));
-  		// klee_make_symbolic(flow_leaf, sizeof(struct flow_ctx_table_leaf), "flow_leaf_L165");
 		flow_leaf = bpf_map_lookup_elem(&flow_ctx_table, &flow_key);
-
-		// int map_has_this_key = klee_int("flow_leaf_L165_map_has_key");
-		// if (!map_has_this_key) {
-		// 	flow_leaf = NULL;
-		// }
 		
 		if (flow_leaf)
 			return bpf_redirect_map(&tx_port,flow_leaf->out_port, 0);
 		else 
 			return XDP_DROP;
 	} else {
-		// struct flow_ctx_table_leaf *flow_leaf = (struct flow_ctx_table_leaf *)malloc(sizeof(struct flow_ctx_table_leaf));
-  		// klee_make_symbolic(flow_leaf, sizeof(struct flow_ctx_table_leaf), "flow_leaf_L174");
 		flow_leaf = bpf_map_lookup_elem(&flow_ctx_table, &flow_key);
-
-		// int map_has_this_key = klee_int("flow_leaf_L174_map_has_key");
-		// if (!map_has_this_key) {
-		// 	flow_leaf = NULL;
-		// }
 			
 		if (!flow_leaf){
 			new_flow.in_port = B_PORT;

@@ -79,7 +79,11 @@ int main(int argc, char** argv){
   }
 
   test.data_meta = 0;
-  test.ingress_ifindex = 0;
+  
+  __u32 temp = 0;
+  klee_make_symbolic(&(temp), sizeof(temp), "ingress_ifindex");
+  test.ingress_ifindex = temp;
+
   test.rx_queue_index = 0;
 
   int ret;
