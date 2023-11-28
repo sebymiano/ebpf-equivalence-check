@@ -1,7 +1,9 @@
 #ifndef __BPF_MAP_HELPERS__
 #define __BPF_MAP_HELPERS__
 
-#include "klee/klee.h"
+// #ifndef USE_GENSYM
+// #include "klee/klee.h"
+// #endif
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,13 +30,13 @@ struct ArrayStub {
 
 void *array_allocate(char* name, char* data_type, unsigned int value_size, unsigned int max_entries) {
   struct ArrayStub *array = malloc(sizeof(struct ArrayStub));
-  klee_assert(array != 0);
+  make_assert(array != 0);
   array->name = malloc(strlen(name) + 1);
   strcpy(array->name, name);
   array->data_type = malloc(strlen(data_type) + 1);
   strcpy(array->data_type, data_type);
   array->data = calloc(max_entries,value_size);
-  klee_assert(array->data);
+  make_assert(array->data);
   array->capacity = max_entries;
   array->value_size = value_size;
   array->lookup_num = 0;
@@ -63,7 +65,7 @@ void unsigned_to_string(unsigned int num, char *str) {
 
 void *array_lookup_elem(struct ArrayStub *array, const void *key) {
   uint index = *(uint *)key;
-  klee_assume(index < array->capacity);
+  make_assume(index < array->capacity);
   void *val_ptr = array->data + index * array->value_size;
 
   // klee_warning("Calling right bpf_map_lookup_elem for ARRAY");
@@ -80,22 +82,22 @@ void *array_lookup_elem(struct ArrayStub *array, const void *key) {
   strcat(ret_value_str, array->name);
 
   void *ret_value = malloc(array->value_size);
-  klee_make_symbolic(ret_value, array->value_size, ret_value_str);
+  make_symbolic(ret_value, array->value_size, ret_value_str);
   return ret_value;
 }
 
 long array_update_elem(struct ArrayStub *array, const void *key,
                        const void *value, unsigned long flags) {
-  klee_assert(flags == 0);
+  make_assert(flags == 0);
   uint index = *(uint *)key;
-  klee_assume(index < array->capacity);
+  make_assume(index < array->capacity);
   void *val_ptr = array->data + index * array->value_size;
   memcpy(val_ptr, value, array->value_size);
   return 0;
 }
 
 void array_reset(struct ArrayStub *array){
-  klee_make_symbolic(array->data,(array->capacity * array->value_size), array->data_type);
+  make_symbolic(array->data,(array->capacity * array->value_size), array->data_type);
 }
 
 /* Map Stub */
@@ -122,7 +124,7 @@ struct MapStub {
 void *map_allocate(char* name, char* key_type, char* val_type, unsigned int key_size, unsigned int value_size,
                    unsigned int max_entries) {
   struct MapStub *map = malloc(sizeof(struct MapStub));
-  klee_assert(map != 0);
+  make_assert(map != 0);
   map->name = malloc(strlen(name) + 1);
   strcpy(map->name, name);
   map->key_type = malloc(strlen(key_type) + 1);
@@ -135,14 +137,14 @@ void *map_allocate(char* name, char* key_type, char* val_type, unsigned int key_
 
   map->keys_present = calloc(max_entries, key_size);
   map->values_present = calloc(max_entries, value_size);
-  klee_assert(map->keys_present && map->values_present);
-  // klee_make_symbolic(map->keys_present, max_entries*key_size, map->key_type);
-  klee_make_symbolic(map->values_present, max_entries*value_size, map->val_type);
+  make_assert(map->keys_present && map->values_present);
+  // make_symbolic(map->keys_present, max_entries*key_size, map->key_type);
+  make_symbolic(map->values_present, max_entries*value_size, map->val_type);
   for (int n = 0; n < NUM_ELEMS; ++n) {
     map->key_deleted[n] = 0;
     // To speed up symbex when prototyping stuff unrelated to exec cycles, make
     // caching concrete
-    // map->keys_cached[n] = klee_int("map_keys_cached");
+    // map->keys_cached[n] = make_int("map_keys_cached");
     map->keys_cached[n] = 0;
   }
 
@@ -168,7 +170,7 @@ void *map_lookup_elem(struct MapStub *map, const void *key) {
   strcat(final_sym_name, lookup_num_str);
   strcat(final_sym_name, sym_name);
   strcat(final_sym_name, map->name);
-  int map_has_this_key = klee_int(final_sym_name);
+  int map_has_this_key = make_int(final_sym_name);
 
   if (map_has_this_key) {
     map->key_deleted[map->keys_seen] = 0;
@@ -181,7 +183,7 @@ void *map_lookup_elem(struct MapStub *map, const void *key) {
     strcat(ret_value_str, map->name);
 
     void *ret_value = malloc(map->value_size);
-    klee_make_symbolic(ret_value, map->value_size, ret_value_str);
+    make_symbolic(ret_value, map->value_size, ret_value_str);
 
     return ret_value;
   } else {
@@ -197,7 +199,7 @@ long map_update_elem(struct MapStub *map, const void *key, const void *value,
     for (int n = 0; n < map->keys_seen; ++n) {
       void *key_ptr = map->keys_present + n * map->key_size;
       if (memcmp(key_ptr, key, map->key_size)) {
-        klee_assert(map->key_deleted[n] &&
+        make_assert(map->key_deleted[n] &&
                     "Trying to insert already present key");
         map->key_deleted[n] = 0;
         void *val_ptr = map->values_present + n * map->value_size;
@@ -209,7 +211,7 @@ long map_update_elem(struct MapStub *map, const void *key, const void *value,
       }
     }
   }
-  klee_assert(map->keys_seen < NUM_ELEMS && "No space left in the map stub");
+  make_assert(map->keys_seen < NUM_ELEMS && "No space left in the map stub");
   void *key_ptr = map->keys_present + map->keys_seen * map->key_size;
   memcpy(key_ptr, key, map->key_size);
   void *val_ptr = map->values_present + map->keys_seen * map->value_size;
@@ -230,7 +232,7 @@ struct MapofMapStub {
 
 void *map_of_map_allocate(char *outer_name, struct bpf_map_def* inner_map, unsigned int id) {
   struct MapofMapStub *arraymap = malloc(sizeof(struct MapofMapStub));
-  klee_assert(arraymap != 0);
+  make_assert(arraymap != 0);
   arraymap->internal_map.type = inner_map->type;
   arraymap->internal_map.key_size = inner_map->key_size;
   arraymap->internal_map.value_size = inner_map->value_size;
@@ -242,8 +244,8 @@ void *map_of_map_allocate(char *outer_name, struct bpf_map_def* inner_map, unsig
 
 void *map_of_map_lookup_elem(struct MapofMapStub *map, const void *key) {
   uint index = *(uint *)key;
-  klee_assert(index >= MIN_PROC_ID && index <= MAX_PROC_ID);
-  klee_assert(map->internal_map.type == 1 || map->internal_map.type == 5 || map->internal_map.type == 9);
+  make_assert(index >= MIN_PROC_ID && index <= MAX_PROC_ID);
+  make_assert(map->internal_map.type == 1 || map->internal_map.type == 5 || map->internal_map.type == 9);
   map->internal_map.type = 5; // Internal map(s) is now per-cpu hash.
   return &(map->internal_map);
 }

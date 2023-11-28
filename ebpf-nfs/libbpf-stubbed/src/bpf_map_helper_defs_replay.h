@@ -1,7 +1,9 @@
 #ifndef __BPF_MAP_HELPERS__
 #define __BPF_MAP_HELPERS__
 
+#ifndef USE_GENSYM
 #include "klee/klee.h"
+#endif
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
@@ -98,7 +100,7 @@ void *array_lookup_elem(struct ArrayStub *array, const void *key) {
   }
 
   uint index = *(uint *)key;
-  klee_assume(index < array->capacity);
+  make_assume(index < array->capacity);
   // void *val_ptr = array->data + index * array->value_size;
 
   // klee_warning("Calling right bpf_map_lookup_elem for ARRAY");
@@ -115,7 +117,7 @@ void *array_lookup_elem(struct ArrayStub *array, const void *key) {
   strcat(ret_value_str, array->name);
 
   void *ret_value = malloc(array->value_size);
-  klee_make_symbolic(ret_value, array->value_size, ret_value_str);
+  make_symbolic(ret_value, array->value_size, ret_value_str);
   return ret_value;
 
   // return val_ptr;
@@ -172,7 +174,7 @@ void *map_allocate(char* name, char* key_type, char* val_type, unsigned int key_
   map->keys_present = calloc(max_entries, key_size);
   map->values_present = calloc(max_entries, value_size);
   assert(map->keys_present && map->values_present);
-  klee_make_symbolic(map->values_present, max_entries*value_size, map->val_type);
+  make_symbolic(map->values_present, max_entries*value_size, map->val_type);
   for (int n = 0; n < NUM_ELEMS; ++n) {
     map->key_deleted[n] = 0;
     map->keys_cached[n] = 0;
@@ -223,7 +225,7 @@ void *map_lookup_elem(struct MapStub *map, const void *key) {
   strcat(final_sym_name, lookup_num_str);
   strcat(final_sym_name, sym_name);
   strcat(final_sym_name, map->name);
-  int map_has_this_key = klee_int(final_sym_name);
+  int map_has_this_key = make_int(final_sym_name);
 
   if (map_has_this_key) {
     map->key_deleted[map->keys_seen] = 0;
@@ -236,7 +238,7 @@ void *map_lookup_elem(struct MapStub *map, const void *key) {
     strcat(ret_value_str, map->name);
 
     void *ret_value = malloc(map->value_size);
-    klee_make_symbolic(ret_value, map->value_size, ret_value_str);
+    make_symbolic(ret_value, map->value_size, ret_value_str);
 
     return ret_value;
   } else {
