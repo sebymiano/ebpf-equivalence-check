@@ -758,11 +758,67 @@ int main(int argc, const char **argv) {
             log_error("ERROR: bpftool not found. Please install it.");
             exit(1);
         }
+
+        /* Let's also check if the folder exists and contains some entries */
+        DIR *d;
+        struct dirent *dir;
+        d = opendir(input_map_dir);
+
+        if (d) {
+            int file_count = 0;
+
+            while ((dir = readdir(d)) != NULL) {
+                if (dir->d_type == DT_REG) {
+                    if (strstr(dir->d_name, ".json") != NULL) {
+                        file_count++;
+                    }
+                }
+            }
+
+            if (file_count == 0) {
+                log_error("ERROR: directory %s is empty", input_map_dir);
+                exit(1);
+            }
+
+            closedir(d);
+        } else {
+            log_error("ERROR: directory %s does not exist", input_map_dir);
+            exit(1);
+        }
     }
 
     if (res_dir == NULL) {
         log_error("Please specify a directory to save the results.");
         exit(1);
+    }
+
+    int ktest_files_count = 0;
+
+    if (input_dir != NULL) {
+        /* Let's also check if the folder exists and contains some entries */
+        DIR *d;
+        struct dirent *dir;
+        d = opendir(input_dir);
+
+        if (d) {
+            while ((dir = readdir(d)) != NULL) {
+                if (dir->d_type == DT_REG) {
+                    if (strstr(dir->d_name, ".ktest") != NULL) {
+                        ktest_files_count++;
+                    }
+                }
+            }
+
+            if (ktest_files_count == 0) {
+                log_error("ERROR: directory %s is empty", input_dir);
+                exit(1);
+            }
+
+            closedir(d);
+        } else {
+            log_error("ERROR: directory %s does not exist", input_dir);
+            exit(1);
+        }
     }
 
     libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
@@ -773,8 +829,11 @@ int main(int argc, const char **argv) {
         struct dirent *dir;
         d = opendir(input_dir);
         if (d) {
-            char *file_list[1024];
+            char **file_list = malloc(ktest_files_count * sizeof(char *));
+            // char *file_list[1024];
             int file_count = 0;
+
+            printf("Reading Ktest files from directory %s\n", input_dir);
 
             while ((dir = readdir(d)) != NULL) {
                 if (dir->d_type == DT_REG) {
@@ -785,6 +844,7 @@ int main(int argc, const char **argv) {
                 }
             }
 
+            printf("Found %d Ktest files\n", file_count);
             // Sort the file names alphabetically
             qsort(file_list, file_count, sizeof(char *), compare_strings);
 
@@ -800,6 +860,7 @@ int main(int argc, const char **argv) {
             }
             
             closedir(d);
+            free(file_list);
         }
     } else {
         // Run BPF program against ktestfile
