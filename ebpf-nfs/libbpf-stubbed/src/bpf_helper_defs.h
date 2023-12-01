@@ -45,23 +45,6 @@ struct bpf_map_def {
 };
 
 #if (defined USES_BPF_MAPS) && (defined KLEE_VERIFICATION)
-#ifdef USE_GENSYM
-#define make_symbolic(...) make_symbolic(__VA_ARGS__)
-#define make_assert(...) gs_assert(__VA_ARGS__)
-#define make_assume(...) gs_assume(__VA_ARGS__)
-#else
-#include "klee/klee.h"
-#define make_symbolic(...) klee_make_symbolic(__VA_ARGS__)
-#define make_assert(...) klee_assert(__VA_ARGS__)
-#define make_assume(...) klee_assume(__VA_ARGS__)
-#endif
-
-int make_int(const char *name) {
-  int x;
-  make_symbolic(&x, sizeof(x), name);
-  return x;
-}
-
 #ifndef REPLAY
 #include "bpf/bpf_map_helper_defs.h"
 #define OPENED_INIT(...) (0)
@@ -258,8 +241,8 @@ void bpf_map_reset_stub(struct bpf_map_def* map) {
 #define BPF_MAP_INIT(x,y,z,w)
 #define BPF_MAP_OF_MAPS_INIT(x,y,u,z,w,v)
 
-#define make_symbolic(...) (0)
-#define make_int(...) (0)
+#define klee_make_symbolic(...) (0)
+#define klee_int(...) (0)
 #define bpf_begin(...) (0)
 
 #endif
@@ -277,20 +260,91 @@ void bpf_map_reset_stub(struct bpf_map_def* map) {
 #if (defined USES_BPF_MAP_LOOKUP_ELEM) && (defined KLEE_VERIFICATION)
 #if (defined OPENED_EQUIVALENCE)
 
+// void unsigned_to_string(unsigned int num, char *str) {
+//     int i = 0;
+//     do {
+//         str[i++] = num % 10 + '0';
+//         num /= 10;
+//     } while (num > 0);
+//     str[i] = '\0';
+    
+//     // Reverse the string
+//     int j = i - 1;
+//     i = 0;
+//     while (i < j) {
+//         char temp = str[i];
+//         str[i] = str[j];
+//         str[j] = temp;
+//         i++;
+//         j--;
+//     }
+// }
+
+// static __attribute__ ((noinline)) void *bpf_map_lookup_elem(void *map, const void *key) {
+//   if(record_calls){
+//     klee_trace_ret_just_ptr(sizeof(void*));
+//     klee_add_bpf_call();
+//   }
+//   struct bpf_map_def *map_ptr = ((struct bpf_map_def *)map);
+//   TRACE_VAL((uint32_t)(map_ptr), "map", _u32)
+//   TRACE_VAR(map_ptr->type, "bpf_map_type");
+//   klee_warning("Calling right bpf_map_lookup_elem");
+
+//   struct MapStub *map_stub = bpf_map_stubs[map_ptr->map_id];
+
+//   if (bpf_map_stub_types[map_ptr->map_id] == ArrayStub)
+//     klee_warning("ArrayStub");
+//   else if (bpf_map_stub_types[map_ptr->map_id] == MapStub)
+//     klee_warning("MapStub");
+//   else if (bpf_map_stub_types[map_ptr->map_id] == MapofMapStub)
+//     klee_warning("MapofMapStub");
+//   else
+//     assert(0 && "Unsupported map type");
+
+//    /* Generating symbol name */
+//   char *sym_name = "_in_";
+//   char *underscore = "_";
+//   char lookup_num_str[20];
+//   klee_assert(map_stub != NULL);
+//   map_stub->lookup_num++;
+//   unsigned_to_string(map_stub->lookup_num, lookup_num_str);
+//   // sprintf(lookup_num_str, "%u", map_stub->lookup_num);
+//   char *final_sym_name = (char *)malloc(1 + strlen(map_stub->key_type) +
+//                                         strlen(sym_name) + strlen(map_stub->name) 
+//                                         + strlen(lookup_num_str));
+//   strcpy(final_sym_name, map_stub->key_type);
+//   strcat(final_sym_name, sym_name);
+//   strcat(final_sym_name, map_stub->name);
+//   // strcat(final_sym_name, underscore);
+//   strcat(final_sym_name, lookup_num_str);
+//   int map_has_this_key = klee_int(final_sym_name);
+
+//   if (map_has_this_key) {
+//     char *key_str = "key";
+//     char *ret_value_str = (char *)malloc(1 + strlen(key_str) + strlen(lookup_num_str));
+//     strcpy(ret_value_str, key_str);
+//     strcat(ret_value_str, lookup_num_str);
+
+//     void *ret_value = malloc(map_stub->value_size);
+//   	klee_make_symbolic(ret_value, map_stub->value_size, ret_value_str);
+
+//     klee_warning("Create and return value for key");
+//     // klee_make_symbolic(ret_value, map_stub->value_size, "val");
+
+//     return ret_value;
+//   } else {
+//     return NULL;
+//   }
+// }
 static __attribute__ ((noinline)) void *bpf_map_lookup_elem(void *map, const void *key) {
-#ifdef USE_KLEE
   if(record_calls){
     klee_trace_ret_just_ptr(sizeof(void*));
     klee_add_bpf_call();
   }
-#endif
 
   struct bpf_map_def *map_ptr = ((struct bpf_map_def *)map);
-#ifdef USE_KLEE
   TRACE_VAL((uint32_t)(map_ptr), "map", _u32)
   TRACE_VAR(map_ptr->type, "bpf_map_type");
-#endif
-
   if (bpf_map_stub_types[map_ptr->map_id] == ArrayStub) {
     // printf("Call to array_lookup_elem\n");
     return array_lookup_elem(bpf_map_stubs[map_ptr->map_id], key);
@@ -306,20 +360,15 @@ static __attribute__ ((noinline)) void *bpf_map_lookup_elem(void *map, const voi
 }
 #else
 static __attribute__ ((noinline)) void *bpf_map_lookup_elem(void *map, const void *key) {
-#ifdef USE_KLEE
   if(record_calls){
     klee_trace_ret_just_ptr(sizeof(void*));
     klee_add_bpf_call();
   }
 
   klee_warning("Calling wrong bpf_map_lookup_elem");
-#endif
-
   struct bpf_map_def *map_ptr = ((struct bpf_map_def *)map);
-#ifdef USE_KLEE
   TRACE_VAL((uint32_t)(map_ptr), "map", _u32)
   TRACE_VAR(map_ptr->type, "bpf_map_type");
-#endif
   if (bpf_map_stub_types[map_ptr->map_id] == ArrayStub)
     return array_lookup_elem(bpf_map_stubs[map_ptr->map_id], key);
   else if (bpf_map_stub_types[map_ptr->map_id] == MapStub)
@@ -358,17 +407,13 @@ static void *(*bpf_map_lookup_elem)(void *map, const void *key) = (void *)1;
 #if (defined USES_BPF_MAP_UPDATE_ELEM) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) long bpf_map_update_elem(void *map, const void *key, const void *value,
                                 __u64 flags) {
-#ifdef USE_KLEE
   if(record_calls){
     klee_trace_ret();
     klee_add_bpf_call();
   }
-#endif
   struct bpf_map_def *map_ptr = ((struct bpf_map_def *)map);
-#ifdef USE_KLEE
   TRACE_VAL((uint32_t)(map_ptr), "map", _u32)
   TRACE_VAR(map_ptr->type, "bpf_map_type");
-#endif
   if (bpf_map_stub_types[map_ptr->map_id] == ArrayStub)
     return array_update_elem(bpf_map_stubs[map_ptr->map_id], key, value, flags);
   else if (bpf_map_stub_types[map_ptr->map_id] == MapStub)
@@ -419,14 +464,12 @@ static long (*bpf_probe_read)(void *dst, __u32 size,
 
 #if (defined USES_BPF_KTIME_GET_NS) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) __u64 bpf_ktime_get_ns(void) {
-#ifdef USE_KLEE
   if(record_calls){
     klee_trace_ret();
     klee_add_bpf_call();
   }
-#endif
   __u64 time;
-  make_symbolic(&time, sizeof(time), "current_time");
+  klee_make_symbolic(&time, sizeof(time), "current_time");
   return time;
 }
 #else
@@ -538,16 +581,14 @@ static __u32 (*bpf_get_prandom_u32)(void) = (void *)7;
 
 #if (defined USES_BPF_GET_SMP_PROC_ID) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) __u32 bpf_get_smp_processor_id(void){
-#ifdef USE_KLEE
   if(record_calls){
     klee_trace_ret();
     klee_add_bpf_call();
   }
-#endif
 
   __u32 proc_id;
-  make_symbolic(&proc_id, sizeof(proc_id), "proc_id");
-  make_assume((proc_id >= MIN_PROC_ID) && (proc_id <= MAX_PROC_ID));
+  klee_make_symbolic(&proc_id, sizeof(proc_id), "proc_id");
+  klee_assume((proc_id >= MIN_PROC_ID) && (proc_id <= MAX_PROC_ID));
   return proc_id;
   // return RANDOM_NUM;
 }
@@ -1156,14 +1197,12 @@ static long (*bpf_get_stackid)(void *ctx, void *map, __u64 flags) = (void *)27;
 
 static __attribute__ ((noinline)) __s64 bpf_csum_diff(__be32 *from, __u32 from_size, __be32 *to,
                            __u32 to_size, __wsum seed) {
-#ifdef USE_KLEE
   if(record_calls){
     klee_trace_ret();
     klee_add_bpf_call();
   }
-#endif
   __s64 csum;
-  make_symbolic(&csum, sizeof(__s64), "Updated Checksum");
+  klee_make_symbolic(&csum, sizeof(__s64), "Updated Checksum");
   return csum;
 }
 #else
@@ -1520,12 +1559,10 @@ static long (*bpf_skb_change_head)(struct __sk_buff *skb, __u32 len,
 static __attribute__ ((noinline)) int bpf_xdp_adjust_head(struct xdp_md *xdp_md, int delta) {
   /* Simple stub for now that only moves data pointer without a check. We assume
    * programs don't use the metadata for now */
-#ifdef USE_KLEE
   if(record_calls){
     klee_trace_ret();
     klee_add_bpf_call();
   }
-#endif
   xdp_md->data += delta;
   return 0;
 }
@@ -1706,12 +1743,10 @@ static long (*bpf_skb_adjust_room)(struct __sk_buff *skb, __s32 len_diff,
 
 #if (defined USES_BPF_REDIRECT_MAP) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) long bpf_redirect_map (void *map, __u32 key, __u64 flags){
-#ifdef USE_KLEE
   if(record_calls){
     klee_trace_ret();
     klee_add_bpf_call();
   }
-#endif
 
   /* Copy-pasted code from bpf_map_lookup_elem here to avoid nesting calls that must be traced 
      Original code

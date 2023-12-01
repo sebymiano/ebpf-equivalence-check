@@ -34,7 +34,7 @@ KERN_USER_H ?= $(wildcard common_kern_user.h)
 LDFLAGS ?= -L$(LIBBPF_DIR)
 LDFLAGS_ORIGIN ?= -L$(LIBBPF_ORIGINAL_DIR)
 
-BPF_CFLAGS ?= -I$(LIBBPF_DIR)/build/usr/include/ -I../headers/
+BPF_CFLAGS ?= -I$(LIBBPF_DIR)/build/usr/include/ -I../headers/ -I $(KLEE_INCLUDE)
 BPF_CFLAGS_ORIGIN ?= -I$(LIBBPF_ORIGINAL_DIR)/build/usr/include/ -I../headers/
 BPF_CFLAGS += -I /usr/include/$(UNAME_P)-linux-gnu
 BPF_CFLAGS_ORIGIN += -I /usr/include/$(UNAME_P)-linux-gnu
@@ -69,7 +69,6 @@ xdp-target: $(XDP_C) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
 	    -target bpf \
 	    -D __BPF_TRACING__ -DKLEE_VERIFICATION\
 		-DOPENED_EQUIVALENCE\
-		-DUSE_KLEE\
 	    $(BPF_CFLAGS) \
 	    -I $(KLEE_INCLUDE) \
 	    -Wno-pointer-sign \
@@ -79,22 +78,10 @@ xdp-target: $(XDP_C) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
 	    -O2 -emit-llvm -c -g $(XDP_C)
 	# $(LLC) -march=bpf -filetype=obj -o $@ ${@:.o=.ll}
 
-xdp-target-gensym: $(XDP_C) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
-	$(CLANG) \
-	    -target bpf \
-	    -D __BPF_TRACING__ -DKLEE_VERIFICATION\
-		-DOPENED_EQUIVALENCE\
-		-DUSE_GENSYM\
-	    $(BPF_CFLAGS) \
-		-fno-discard-value-names -S \
-	    -O0 -emit-llvm -Xclang -disable-O0-optnone -c $(XDP_C)
-	# $(LLC) -march=bpf -filetype=obj -o $@ ${@:.o=.ll}
-
 xdp-target-runtest: $(XDP_C) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
 	$(CLANG) \
 	    -D __BPF_TRACING__ -DKLEE_VERIFICATION -DREPLAY \
 		-DOPENED_EQUIVALENCE\
-		-DUSE_KLEE\
 	    $(BPF_CFLAGS) \
 		$(LIBJSON_PKG_CFLAGS) \
 	    -I $(KLEE_INCLUDE) \
@@ -143,8 +130,6 @@ perf-contract:
 	cd klee-last && $(KLEE_INCLUDE)/../scripts/process-traces.sh . verify-dpdk llvm Num_bucket_traversals 1 Num_hash_collisions 0  expired_flows 0
 
 build-tests: clean libbpf xdp-target symbex
-
-build-gensym: clean libbpf xdp-target-gensym
 
 build-replay-tests: clean libbpf xdp-target-runtest
 
