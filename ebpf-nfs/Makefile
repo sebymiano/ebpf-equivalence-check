@@ -5,7 +5,7 @@ COMMON_DIR:=$(ROOT_DIR)/../common
 PIX_DIR:= $(ROOT_DIR)/../..
 
 LLC ?= llc
-CLANG ?= clang-11
+CLANG ?= clang
 CC := gcc
 PKG_CONFIG := pkg-config
 UNAME_P := $(shell uname -p)
