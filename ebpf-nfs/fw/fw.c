@@ -39,8 +39,12 @@ int main(int argc, char** argv){
 
   /* Init from xdp_fw_user.c */
   const uint num_ports = 2;
-  int key[num_ports] = {B_PORT,A_PORT};
-	int ifindex_out[num_ports] = {B_PORT,A_PORT};
+  int key[num_ports];
+  key[0] = B_PORT;
+  key[1] = A_PORT;
+	int ifindex_out[num_ports];
+  key[0] = B_PORT;
+  key[1] = A_PORT;
 
   for(uint i = 0; i < num_ports; i++){
     if(bpf_map_update_elem(&tx_port,&key[i], &ifindex_out[i],0) < 0)
