@@ -1,33 +1,29 @@
 #!/bin/bash
 
-#!/bin/bash
+# Get the directory of this script
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Function to display usage information
 usage() {
-  echo "Usage: $0 -d <input_directory> -o <output_directory> -b <binary>"
+  echo "Usage: $0 -d <input_directory> -o <output_directory>"
   echo "Options:"
   echo "  -d  Directory to search for .ktest files"
   echo "  -o  Output directory to store new files"
-  echo "  -b  Binary file to execute"
   echo "  -h  Show this help message"
 }
 
 # Initialize variables
-input_dir=""
+input_dir="${DIR}"
 output_dir="ktest-text"
-binary=""
 
 # Parse command line options
-while getopts "d:o:b:h" opt; do
+while getopts "d:o:h" opt; do
   case $opt in
     d)
       input_dir=$OPTARG
       ;;
     o)
       output_dir=$OPTARG
-      ;;
-    b)
-      binary=$OPTARG
       ;;
     h)
       usage
