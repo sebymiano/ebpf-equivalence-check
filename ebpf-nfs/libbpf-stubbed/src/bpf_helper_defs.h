@@ -337,14 +337,7 @@ void bpf_map_reset_stub(struct bpf_map_def* map) {
 //   }
 // }
 static __attribute__ ((noinline)) void *bpf_map_lookup_elem(void *map, const void *key) {
-  if(record_calls){
-    klee_trace_ret_just_ptr(sizeof(void*));
-    klee_add_bpf_call();
-  }
-
   struct bpf_map_def *map_ptr = ((struct bpf_map_def *)map);
-  TRACE_VAL((uint32_t)(map_ptr), "map", _u32)
-  TRACE_VAR(map_ptr->type, "bpf_map_type");
   if (bpf_map_stub_types[map_ptr->map_id] == ArrayStub) {
     // printf("Call to array_lookup_elem\n");
     return array_lookup_elem(bpf_map_stubs[map_ptr->map_id], key);
@@ -360,15 +353,9 @@ static __attribute__ ((noinline)) void *bpf_map_lookup_elem(void *map, const voi
 }
 #else
 static __attribute__ ((noinline)) void *bpf_map_lookup_elem(void *map, const void *key) {
-  if(record_calls){
-    klee_trace_ret_just_ptr(sizeof(void*));
-    klee_add_bpf_call();
-  }
 
   klee_warning("Calling wrong bpf_map_lookup_elem");
   struct bpf_map_def *map_ptr = ((struct bpf_map_def *)map);
-  TRACE_VAL((uint32_t)(map_ptr), "map", _u32)
-  TRACE_VAR(map_ptr->type, "bpf_map_type");
   if (bpf_map_stub_types[map_ptr->map_id] == ArrayStub)
     return array_lookup_elem(bpf_map_stubs[map_ptr->map_id], key);
   else if (bpf_map_stub_types[map_ptr->map_id] == MapStub)
@@ -407,13 +394,7 @@ static void *(*bpf_map_lookup_elem)(void *map, const void *key) = (void *)1;
 #if (defined USES_BPF_MAP_UPDATE_ELEM) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) long bpf_map_update_elem(void *map, const void *key, const void *value,
                                 __u64 flags) {
-  if(record_calls){
-    klee_trace_ret();
-    klee_add_bpf_call();
-  }
   struct bpf_map_def *map_ptr = ((struct bpf_map_def *)map);
-  TRACE_VAL((uint32_t)(map_ptr), "map", _u32)
-  TRACE_VAR(map_ptr->type, "bpf_map_type");
   if (bpf_map_stub_types[map_ptr->map_id] == ArrayStub)
     return array_update_elem(bpf_map_stubs[map_ptr->map_id], key, value, flags);
   else if (bpf_map_stub_types[map_ptr->map_id] == MapStub)
@@ -464,10 +445,6 @@ static long (*bpf_probe_read)(void *dst, __u32 size,
 
 #if (defined USES_BPF_KTIME_GET_NS) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) __u64 bpf_ktime_get_ns(void) {
-  if(record_calls){
-    klee_trace_ret();
-    klee_add_bpf_call();
-  }
   __u64 time;
   klee_make_symbolic(&time, sizeof(time), "current_time");
   return time;
@@ -581,10 +558,6 @@ static __u32 (*bpf_get_prandom_u32)(void) = (void *)7;
 
 #if (defined USES_BPF_GET_SMP_PROC_ID) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) __u32 bpf_get_smp_processor_id(void){
-  if(record_calls){
-    klee_trace_ret();
-    klee_add_bpf_call();
-  }
 
   __u32 proc_id;
   klee_make_symbolic(&proc_id, sizeof(proc_id), "proc_id");
@@ -1197,10 +1170,6 @@ static long (*bpf_get_stackid)(void *ctx, void *map, __u64 flags) = (void *)27;
 
 static __attribute__ ((noinline)) __s64 bpf_csum_diff(__be32 *from, __u32 from_size, __be32 *to,
                            __u32 to_size, __wsum seed) {
-  if(record_calls){
-    klee_trace_ret();
-    klee_add_bpf_call();
-  }
   __s64 csum;
   klee_make_symbolic(&csum, sizeof(__s64), "Updated Checksum");
   return csum;
@@ -1559,10 +1528,6 @@ static long (*bpf_skb_change_head)(struct __sk_buff *skb, __u32 len,
 static __attribute__ ((noinline)) int bpf_xdp_adjust_head(struct xdp_md *xdp_md, int delta) {
   /* Simple stub for now that only moves data pointer without a check. We assume
    * programs don't use the metadata for now */
-  if(record_calls){
-    klee_trace_ret();
-    klee_add_bpf_call();
-  }
   xdp_md->data += delta;
   return 0;
 }
@@ -1743,11 +1708,6 @@ static long (*bpf_skb_adjust_room)(struct __sk_buff *skb, __s32 len_diff,
 
 #if (defined USES_BPF_REDIRECT_MAP) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) long bpf_redirect_map (void *map, __u32 key, __u64 flags){
-  if(record_calls){
-    klee_trace_ret();
-    klee_add_bpf_call();
-  }
-
   /* Copy-pasted code from bpf_map_lookup_elem here to avoid nesting calls that must be traced 
      Original code
       if(bpf_map_lookup_elem(map, &key))
