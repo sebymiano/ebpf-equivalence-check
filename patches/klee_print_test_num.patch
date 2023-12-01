@@ -1,0 +1,13 @@
+diff --git a/tools/klee/main.cpp b/tools/klee/main.cpp
+index 681ccea8..81d00e47 100644
+--- a/tools/klee/main.cpp
++++ b/tools/klee/main.cpp
+@@ -674,6 +674,8 @@ void KleeHandler::processTestCase(ExecutionState &state,
+ 
+       if (DumpConstraintTree) {
+         m_constraintTree.addTest(id, state);
++      } else {
++        std::cout << "Added test number: " << id <<"\n";
+       }
+ 
+       if (DumpCallTraces) {

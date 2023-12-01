@@ -1,0 +1,122 @@
+FROM klee/klee:latest as klee-builder
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN sudo apt-get -qq update \
+ && sudo apt-get -qq install --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    libnuma-dev \
+    python3-pip \
+    python3-pyelftools \
+    python3-setuptools \
+    wget \
+	curl \
+	git \
+	libgoogle-perftools-dev \
+	python2.7 \
+	python3-minimal \
+	parallel \
+	xz-utils \
+	gcc-multilib \
+	graphviz \
+	cmake \
+    sudo net-tools \
+    psmisc procps \
+    iproute2 git \
+    linux-headers-generic \
+    python3 python3-pip \
+    gperf \
+    libgoogle-perftools-dev \
+    libpcap-dev \
+    bison \
+    flex \
+    zlib1g-dev \
+    libncurses5-dev \
+    libpcap-dev \
+    python2.7 \
+    python3-dev \
+    libedit-dev \
+    libreadline-dev
+
+RUN pip3 install meson ninja
+
+RUN sudo apt-get -qq update \
+ && sudo apt-get -qq install --no-install-recommends \
+    swig
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG Z3_RELEASE=master
+ARG OCAML_RELEASE=4.06.0
+
+WORKDIR /pix
+
+ADD install /pix/install
+
+RUN sudo apt-get -qq update \
+ && sudo apt-get -qq install --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    libnuma-dev \
+    python3-pip \
+    python3-pyelftools \
+    python3-setuptools \
+    wget \
+	curl \
+	git \
+	libgoogle-perftools-dev \
+	python2.7 \
+	python3-minimal \
+	parallel \
+	xz-utils \
+	gcc-multilib \
+	graphviz \
+	cmake
+
+RUN pip3 install meson ninja
+
+RUN sudo apt-get update && \
+    sudo DEBIAN_FRONTEND=noninteractive apt-get -yq install sudo net-tools \
+                                                        psmisc procps \
+                                                        iproute2 git \
+                                                        linux-headers-generic \
+                                                        python3 python3-pip \
+                                                        python-is-python3
+
+RUN sudo apt-get update && \
+    sudo DEBIAN_FRONTEND=noninteractive apt-get -yq install gperf \
+                                                       libgoogle-perftools-dev \
+                                                       libpcap-dev
+
+# Install and compile Z3
+WORKDIR /z3
+RUN git clone --depth 1 --branch "$Z3_RELEASE" https://github.com/Z3Prover/z3 /z3
+RUN python scripts/mk_make.py --prefix=/z3/build
+RUN cd build \
+    && make -kj \
+    && make install
+
+RUN sudo apt-get update && \
+    sudo DEBIAN_FRONTEND=noninteractive apt-get -yq install libelf-dev \
+                                                       pkg-config \
+                                                       time 
+
+WORKDIR /libjson-c
+
+RUN git clone --depth 1 --branch json-c-0.17-20230812 https://github.com/json-c/json-c.git /libjson-c
+RUN mkdir json-c-build
+RUN cd json-c-build \
+    && cmake .. \
+    && make -j \
+    && sudo make install
+
+ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+
+WORKDIR /pix
+
+ADD ebpf-nfs/common /pix/ebpf-nfs/common
+ADD ebpf-nfs/headers /pix/ebpf-nfs/headers
+ADD ebpf-nfs/libbpf-stubbed /pix/ebpf-nfs/libbpf-stubbed
+ADD ebpf-nfs/Makefile /pix/ebpf-nfs/Makefile
+
+CMD ["/bin/bash"]

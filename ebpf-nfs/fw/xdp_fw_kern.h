@@ -80,8 +80,7 @@ struct {
 
 SEC("xdp")
 int xdp_fw_prog(struct xdp_md *ctx)
-{
-	
+{	
 	void* data_end = (void*)(long)ctx->data_end;
 	void* data         = (void*)(long)ctx->data;
 	

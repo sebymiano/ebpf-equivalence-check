@@ -21,14 +21,17 @@
 #define ETH_P_IPV6 0x86DD
 
 #if (defined KLEE_VERIFICATION)
-unsigned long long load_byte(void *skb, unsigned long long off) {
-    return (__u8)(skb + off);
+unsigned long long load_byte(struct __sk_buff *skb, unsigned long long off) {
+    void *data = (void*)(long)skb->data;
+    return (__u8)(data + off);
 }
-unsigned long long load_half(void *skb, unsigned long long off) {
-    return (__u16)(skb + off);
+unsigned long long load_half(struct __sk_buff *skb, unsigned long long off) {
+    void *data = (void*)(long)skb->data;
+    return (__u16)(data + off);
 }
-unsigned long long load_word(void *skb, unsigned long long off) {
-    return (__u32)(skb + off);
+unsigned long long load_word(struct __sk_buff *skb, unsigned long long off) {
+    void *data = (void*)(long)skb->data;
+    return (__u32)(data + off);
 }
 #else
 unsigned long long load_byte(void *skb, unsigned long long off) asm("llvm.bpf.load.byte");

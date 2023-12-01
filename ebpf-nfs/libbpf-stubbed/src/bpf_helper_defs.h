@@ -558,7 +558,7 @@ static long (*bpf_trace_printk)(const char *fmt, __u32 fmt_size,
 #if (defined USES_BPF_GET_PRANDOM_U32) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) __u32 bpf_get_prandom_u32(void){
   // __u32 random_num;
-  // make_symbolic(&random_num, sizeof(random_num), "random_num");
+  // klee_make_symbolic(&random_num, sizeof(random_num), "random_num");
   // return random_num;
   // return RANDOM_NUM;
   return (uint32_t)rand();

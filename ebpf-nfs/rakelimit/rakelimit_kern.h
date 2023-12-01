@@ -102,7 +102,7 @@ struct bpf_map_def SEC("maps") countmin = {
 	.max_entries = ARRAY_SIZE(generalisations),
 };
 
-static FORCE_INLINE void ipv6_hash(const struct in6_addr *ip, struct address_hash *a, struct address_hash *b)
+__attribute__((noinline)) static void ipv6_hash(const struct in6_addr *ip, struct address_hash *a, struct address_hash *b)
 {
 	a->vals[ADDRESS_IP]  = fasthash64(ip, sizeof(*ip), FH_SEED);
 	b->vals[ADDRESS_IP]  = hashlittle(ip, sizeof(*ip), L3_SEED);
@@ -110,7 +110,7 @@ static FORCE_INLINE void ipv6_hash(const struct in6_addr *ip, struct address_has
 	b->vals[ADDRESS_NET] = hashlittle(ip, 48 / 8, L3_SEED);
 }
 
-static FORCE_INLINE void ipv4_hash(struct in_addr ip, struct address_hash *a, struct address_hash *b)
+__attribute__((noinline)) static void ipv4_hash(struct in_addr ip, struct address_hash *a, struct address_hash *b)
 {
 	a->vals[ADDRESS_IP] = fasthash64(&ip, sizeof(ip), FH_SEED);
 	b->vals[ADDRESS_IP] = hashlittle(&ip, sizeof(ip), L3_SEED);
@@ -119,7 +119,7 @@ static FORCE_INLINE void ipv4_hash(struct in_addr ip, struct address_hash *a, st
 	b->vals[ADDRESS_NET] = hashlittle(&ip, sizeof(ip), L3_SEED);
 }
 
-static FORCE_INLINE __u64 hash_mix(__u64 a, __u64 b)
+__attribute__((noinline)) static __u64 hash_mix(__u64 a, __u64 b)
 {
 	// Adapted from https://stackoverflow.com/a/27952689. The constant below
 	// is derived from the golden ratio.
@@ -127,7 +127,7 @@ static FORCE_INLINE __u64 hash_mix(__u64 a, __u64 b)
 	return a;
 }
 
-static FORCE_INLINE __u32 gen_hash(const struct gen *gen, const struct hash *ph)
+__attribute__((noinline)) static __u32 gen_hash(const struct gen *gen, const struct hash *ph)
 {
 	__u64 tmp = 0;
 
@@ -151,7 +151,7 @@ static FORCE_INLINE __u32 gen_hash(const struct gen *gen, const struct hash *ph)
 	return tmp - (tmp >> 32);
 }
 
-static __u32 FORCE_INLINE add_to_node(__u32 node_idx, __u64 ts, const struct cm_hash *h)
+__attribute__((noinline)) static __u32 add_to_node(__u32 node_idx, __u64 ts, const struct cm_hash *h)
 {
 	struct countmin *node = bpf_map_lookup_elem(&countmin, &node_idx);
 	if (node == NULL) {
@@ -160,7 +160,7 @@ static __u32 FORCE_INLINE add_to_node(__u32 node_idx, __u64 ts, const struct cm_
 	return cm_add_and_query(node, ts, h);
 }
 
-static FORCE_INLINE void log_level_drop(__u32 level)
+__attribute__((noinline)) static void log_level_drop(__u32 level)
 {
 	__u64 *count = bpf_map_lookup_elem(&stats, &level);
 	if (count == NULL) {
@@ -169,24 +169,24 @@ static FORCE_INLINE void log_level_drop(__u32 level)
 	(*count)++;
 }
 
-static FORCE_INLINE __u64 transport_offset_ipv4(struct __sk_buff *skb)
+__attribute__((noinline)) static __u64 transport_offset_ipv4(struct __sk_buff *skb)
 {
 	__u8 version_ihl = load_byte(skb, offsetof(struct iphdr, version_ihl));
 	return (version_ihl & 0xf) * sizeof(__u32);
 }
 
-static FORCE_INLINE __u64 transport_offset_ipv6(struct __sk_buff *skb)
+__attribute__((noinline)) static __u64 transport_offset_ipv6(struct __sk_buff *skb)
 {
 	// TODO: Check nexthdr to make sure it's UDP.
 	return sizeof(struct ip6_hdr);
 }
 
-static FORCE_INLINE int load_ipv6(struct in6_addr *ip, struct __sk_buff *skb, __u64 off)
+__attribute__((noinline)) static int load_ipv6(struct in6_addr *ip, struct __sk_buff *skb, __u64 off)
 {
 	return bpf_skb_load_bytes(skb, off, ip, sizeof(*ip));
 }
 
-static FORCE_INLINE int drop_or_accept(__u32 level, fpoint limit, __u32 max_rate, __u32 rand)
+__attribute__((noinline)) static int drop_or_accept(__u32 level, fpoint limit, __u32 max_rate, __u32 rand)
 {
 	if (div_by_int(to_fixed_point(limit, 0), max_rate) < to_fixed_point(0, rand)) {
 		log_level_drop(level);
@@ -195,10 +195,11 @@ static FORCE_INLINE int drop_or_accept(__u32 level, fpoint limit, __u32 max_rate
 	return SKB_PASS;
 }
 
-static FORCE_INLINE int process_packet(struct __sk_buff *skb, __u16 proto, __u64 ts, __u32 rand, __u64 *rate_exceeded_level)
+__attribute__((noinline)) static int process_packet(struct __sk_buff *skb, __u16 proto, __u64 ts, __u32 rand, __u64 *rate_exceeded_level)
 {
 #if (defined KLEE_VERIFICATION)
-	__u32 limit = 0;
+	__u32 limit;
+	klee_make_symbolic(&limit, sizeof(limit), "limit");
 #else
 	__u32 limit = PARAMETER(__u32, "LIMIT");
 #endif
@@ -282,7 +283,7 @@ static FORCE_INLINE int process_packet(struct __sk_buff *skb, __u16 proto, __u64
 }
 
 SEC("socket/ipv4")
-int filter_ipv4(struct __sk_buff *skb)
+__attribute__((noinline)) int filter_ipv4(struct __sk_buff *skb)
 {
 	// return process_packet(skb, ETH_P_IP, bpf_ktime_get_ns(), bpf_get_prandom_u32(), NULL);
 	return process_packet(skb, ETH_P_IP, 0x51251, 0x84251, NULL);

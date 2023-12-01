@@ -33,7 +33,7 @@
 #include "rakelimit_kern.h"
 
 struct __attribute__((__packed__)) rakelimit_pkt {
-  char payload[1400];
+  char payload[1500];
 };
 
 int main(int argc, char** argv){
@@ -48,13 +48,13 @@ int main(int argc, char** argv){
   struct __sk_buff test;
   
   struct rakelimit_pkt *pkt = malloc(sizeof(struct rakelimit_pkt));
-  make_symbolic(pkt, sizeof(struct rakelimit_pkt), "user_buf");
+  klee_make_symbolic(pkt, sizeof(struct rakelimit_pkt), "user_buf");
 
-  test.data = (long)(&(pkt->payload));
+  test.data = (long)(&(pkt->payload[0]));
   test.data_end = (long)(pkt + 1);
   
   __u32 temp = 0;
-  make_symbolic(&(temp), sizeof(temp), "ingress_ifindex");
+  klee_make_symbolic(&(temp), sizeof(temp), "ingress_ifindex");
   test.ingress_ifindex = temp;
 
 //   test.rx_queue_index = 0;
