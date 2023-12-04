@@ -119,9 +119,9 @@ libbpf-origin:
 
 symbex:
 	/usr/bin/time -v \
-		klee -allocate-determ -allocate-determ-start-address=0x00040000000 -allocate-determ-size=1000 -libc=uclibc --external-calls=concrete --disable-verify \
-		-dump-call-traces -dump-call-trace-instructions -call-trace-instr-startfn=$(XDP_FUNCTION) -call-trace-instr-endfn=$(XDP_FUNCTION) -write-test-info \
-		-solver-backend=z3 -exit-on-error -max-memory=750000 -search=dfs -condone-undeclared-havocs $(XDP_TARGETS).bc
+		klee -libc=uclibc --external-calls=concrete --disable-verify \
+		-write-test-info \
+		-solver-backend=z3 -exit-on-error -max-memory=750000 -search=dfs $(XDP_TARGETS).bc
 
 helper-contracts:
 	cd $(PIX_DIR)/dpdk-nfs/perf-contracts && make clean && make LLVM=TRUE
