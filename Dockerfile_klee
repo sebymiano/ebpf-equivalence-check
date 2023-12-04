@@ -111,6 +111,7 @@ RUN cd json-c-build \
     && sudo make install
 
 ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+ENV KLEE_INCLUDE=/usr/include
 
 WORKDIR /pix
 
