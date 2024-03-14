@@ -15,6 +15,8 @@ import logging
 
 GENERATE_TEST_CASE_SCRIPT="generate-test-cases.sh"
 
+PIX_FOLDER="/pix"
+
 class CustomFormatter(logging.Formatter):
 
     grey = "\x1b[38;20m"
@@ -46,7 +48,7 @@ def create_tar_archive(source_dir, archive_name):
 def generate_test_cases(prog_dir, container_output_dir, local_output_dir):
     volume_mapping = {
         sys.path[0]: {
-            'bind': '/pix/scripts',
+            'bind': f'{PIX_FOLDER}/scripts',
             'mode': 'rw'
         },
     }
@@ -64,14 +66,14 @@ def generate_test_cases(prog_dir, container_output_dir, local_output_dir):
     # Copy the archive to the container and then extract it
     with open(archive_name, 'rb') as archive:
         logger.debug(f"Copying {archive_name} to container")
-        container.put_archive(f"/pix/ebpf-nfs", archive.read())
+        container.put_archive(f"{PIX_FOLDER}/ebpf-nfs", archive.read())
 
     os.remove(archive_name)
 
     try:
-        cmd = f"{os.path.join('/pix/scripts/', GENERATE_TEST_CASE_SCRIPT)} -d {os.path.join('/pix/ebpf-nfs/', prog_dir_basename)} -o {os.path.join('/pix', container_output_dir)}"
+        cmd = f"{os.path.join(f'{PIX_FOLDER}/scripts/', GENERATE_TEST_CASE_SCRIPT)} -d {os.path.join(f'{PIX_FOLDER}/ebpf-nfs/', prog_dir_basename)} -o {os.path.join(f'{PIX_FOLDER}', container_output_dir)}"
         logger.info(f"Running {cmd}")
-        logger.info(f"This will take a while... (it depends on the size of the program)")
+        logger.info("This will take a while... (it depends on the size of the program)")
 
         # Start the exec instance
         exec_instance = docker_client.api.exec_create(container.id, cmd, stdout=True, stderr=True)
@@ -106,7 +108,7 @@ def generate_test_cases(prog_dir, container_output_dir, local_output_dir):
 
         # Let's retrieve the result from the container
         logger.debug("Retrieving result from container")
-        stream, _ = container.get_archive(os.path.join('/pix', container_output_dir))
+        stream, _ = container.get_archive(os.path.join(f'{PIX_FOLDER}', container_output_dir))
 
         with open(f"{container_output_dir}.tar", 'wb') as out_file:
             for chunk in stream:
