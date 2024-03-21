@@ -31,7 +31,8 @@ RUN apt-get -q update \
     libcap-dev \
     cmake \
     libbsd-dev \
-    libedit-dev 
+    libedit-dev \
+    libjson-c-dev 
 
 RUN apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
