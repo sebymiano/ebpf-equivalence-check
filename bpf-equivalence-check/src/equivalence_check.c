@@ -371,8 +371,9 @@ int run_bpf_program_with_ktest_file(struct bpf_object *obj, int prog_fd, const c
     struct xdp_md ctx_in = { 
                 .data = sizeof(__u32),
 				.data_end = user_buf->numBytes + sizeof(__u32),
-                .ingress_ifindex = *(int*)ingress_ifindex->bytes
+                .ingress_ifindex = 1
     };
+    //.ingress_ifindex = *(int*)ingress_ifindex->bytes
 
     DECLARE_LIBBPF_OPTS(bpf_test_run_opts, topts,
             .data_in = buf,
