@@ -31,6 +31,8 @@ struct __attribute__((__packed__)) pkt {
   char payload[1500];
 };
 
+#define NUM_PORTS 2
+
 int main(int argc, char** argv){
   OPENED_INIT(argc, argv);
 
@@ -38,11 +40,10 @@ int main(int argc, char** argv){
   BPF_MAP_INIT(&flow_ctx_table, "flow_ctx_table", "pkt.flow", "output_port");
 
   /* Init from xdp_fw_user.c */
-  const uint num_ports = 2;
-  int key[num_ports] = {B_PORT,A_PORT};
-	int ifindex_out[num_ports] = {B_PORT,A_PORT};
+  int key[NUM_PORTS] = {B_PORT,A_PORT};
+	int ifindex_out[NUM_PORTS] = {B_PORT,A_PORT};
 
-  for(uint i = 0; i < num_ports; i++){
+  for(uint i = 0; i < NUM_PORTS; i++){
     if(bpf_map_update_elem(&tx_port,&key[i], &ifindex_out[i],0) < 0)
       return -1;
   }

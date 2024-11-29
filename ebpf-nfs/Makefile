@@ -1,11 +1,12 @@
 ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
-LIBBPF_DIR:=$(ROOT_DIR)/../libbpf-stubbed/src
+LIBBPF_DIR:=$(ROOT_DIR)/../../libbpf-stubbed/src
 LIBBPF_ORIGINAL_DIR:=$(ROOT_DIR)/../../bpf-equivalence-check/libbpf/src
 COMMON_DIR:=$(ROOT_DIR)/../common
 PIX_DIR:= $(ROOT_DIR)/../..
 
-LLC ?= llc
-CLANG ?= clang
+LLVM_RELEASE=12
+LLC=llc-$(LLVM_RELEASE)
+CLANG=clang-$(LLVM_RELEASE)
 CC := gcc
 PKG_CONFIG := pkg-config
 UNAME_P := $(shell uname -p)
@@ -66,25 +67,36 @@ llvm-check: $(CLANG) $(LLC)
 
 xdp-target: $(XDP_C) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
 	$(CLANG) \
-	    -target bpf \
-	    -D __BPF_TRACING__ -DKLEE_VERIFICATION\
-		-DOPENED_EQUIVALENCE\
-	    $(BPF_CFLAGS) \
-	    -I $(KLEE_INCLUDE) \
-	    -Wno-pointer-sign \
-	    -Wno-compare-distinct-pointer-types \
-	    -Werror \
-	    -fno-builtin \
-	    -O2 -emit-llvm -c -g $(XDP_C)
+		-target bpf \
+		-DKLEE_VERIFICATION \
+		-DOPENED_EQUIVALENCE \
+		$(BPF_CFLAGS) \
+		-I $(KLEE_INCLUDE) \
+		-D__USE_VMLINUX__ \
+		-D__TARGET_ARCH_x86 \
+		-DBPF_NO_PRESERVE_ACCESS_INDEX \
+		-Wall \
+		-Wno-unused-value \
+		-Wno-unused-variable \
+		-Wno-pointer-sign \
+		-Wno-compare-distinct-pointer-types \
+		-Werror \
+		-fno-builtin \
+		-O0 -emit-llvm -c -g $(XDP_C)
 	# $(LLC) -march=bpf -filetype=obj -o $@ ${@:.o=.ll}
 
 xdp-target-runtest: $(XDP_C) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
 	$(CLANG) \
-	    -D __BPF_TRACING__ -DKLEE_VERIFICATION -DREPLAY \
-		-DOPENED_EQUIVALENCE\
+	    -D __BPF_TRACING__ \
+		-DKLEE_VERIFICATION \
+		-DREPLAY \
+		-DOPENED_EQUIVALENCE \
 	    $(BPF_CFLAGS) \
 		$(LIBJSON_PKG_CFLAGS) \
 	    -I $(KLEE_INCLUDE) \
+		-D__USE_VMLINUX__ \
+		-D__TARGET_ARCH_x86 \
+		-DBPF_NO_PRESERVE_ACCESS_INDEX \
 	    -Wall \
 	    -Wno-unused-value \
 	    -Wno-pointer-sign \
@@ -94,7 +106,7 @@ xdp-target-runtest: $(XDP_C) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
 		-L/klee/build/lib/ \
 		$(LIBJSON_PKG_LIBS) \
 		-lkleeRuntest \
-	    -O2 -o ${XDP_C:.c=.bin} $(XDP_C) 
+	    -O0 -o ${XDP_C:.c=.bin} $(XDP_C) 
 
 xdp-target-origin: $(XDP_BPF) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
 	cp ${XDP_BPF:.c=.h} $(XDP_BPF)
@@ -117,11 +129,10 @@ libbpf:
 libbpf-origin:
 	cd $(LIBBPF_ORIGINAL_DIR) && rm -rf obj build && mkdir obj build && BUILD_STATIC_ONLY=y OBJDIR=obj DESTDIR=build make install
 
-symbex:
+symbex: xdp-target
 	/usr/bin/time -v \
-		klee -allocate-determ -allocate-determ-start-address=0x00040000000 -allocate-determ-size=1000 -libc=uclibc --external-calls=concrete --disable-verify \
-		-call-trace-instr-startfn=$(XDP_FUNCTION) -call-trace-instr-endfn=$(XDP_FUNCTION) -write-test-info \
-		-solver-backend=z3 -exit-on-error -max-memory=750000 -search=dfs -condone-undeclared-havocs $(XDP_TARGETS).bc
+		klee -kdalloc -kdalloc-heap-start-address=0x00040000000 -kdalloc-heap-size=1 -libc=uclibc --external-calls=all --disable-verify \
+		-write-test-info -solver-backend=z3 -exit-on-error -max-memory=750000 -search=dfs $(XDP_TARGETS).bc
 
 helper-contracts:
 	cd $(PIX_DIR)/dpdk-nfs/perf-contracts && make clean && make LLVM=TRUE
