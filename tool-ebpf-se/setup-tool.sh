@@ -218,6 +218,7 @@ clean_klee_uclibc()
 source_install_klee()
 {
 	line "$PATHSFILE" 'KLEE_INCLUDE' "$BUILDDIR/klee/include"
+	line "$PATHSFILE" 'KLEE_LIB' "$BUILDDIR/klee/build/lib"
 	line_multi "$PATHSFILE" 'PATH' "$BUILDDIR/klee/build/bin:\$PATH"
 	. "$PATHSFILE"
 

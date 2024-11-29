@@ -87,39 +87,39 @@ xdp-target: $(XDP_C) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
 
 xdp-target-runtest: $(XDP_C) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
 	$(CLANG) \
-	    -D __BPF_TRACING__ \
+		-D __BPF_TRACING__ \
 		-DKLEE_VERIFICATION \
 		-DREPLAY \
 		-DOPENED_EQUIVALENCE \
-	    $(BPF_CFLAGS) \
+		$(BPF_CFLAGS) \
 		$(LIBJSON_PKG_CFLAGS) \
-	    -I $(KLEE_INCLUDE) \
+		-I $(KLEE_INCLUDE) \
 		-D__USE_VMLINUX__ \
 		-D__TARGET_ARCH_x86 \
 		-DBPF_NO_PRESERVE_ACCESS_INDEX \
-	    -Wall \
-	    -Wno-unused-value \
-	    -Wno-pointer-sign \
-	    -Wno-compare-distinct-pointer-types \
-	    -Werror \
-	    -fno-builtin \
-		-L/klee/build/lib/ \
+		-Wall \
+		-Wno-unused-value \
+		-Wno-pointer-sign \
+		-Wno-compare-distinct-pointer-types \
+		-Werror \
+		-fno-builtin \
+		-L$(KLEE_LIB) \
 		$(LIBJSON_PKG_LIBS) \
 		-lkleeRuntest \
-	    -O0 -o ${XDP_C:.c=.bin} $(XDP_C) 
+		-O2 -o ${XDP_C:.c=.bin} $(XDP_C) 
 
 xdp-target-origin: $(XDP_BPF) Makefile $(KERN_USER_H) $(EXTRA_DEPS)
 	cp ${XDP_BPF:.c=.h} $(XDP_BPF)
 	$(CLANG) \
-	    -D __BPF_TRACING__ \
-	    $(BPF_CFLAGS_ORIGIN) -DDEBUG \
-	    -Wall \
-	    -Wno-unused-value \
-	    -Wno-pointer-sign \
-	    -Wno-compare-distinct-pointer-types \
-	    -Werror \
-	    -fno-builtin \
-	    -O2 -emit-llvm -c -g $(XDP_BPF)
+		-D __BPF_TRACING__ \
+		$(BPF_CFLAGS_ORIGIN) -DDEBUG \
+		-Wall \
+		-Wno-unused-value \
+		-Wno-pointer-sign \
+		-Wno-compare-distinct-pointer-types \
+		-Werror \
+		-fno-builtin \
+		-O2 -emit-llvm -c -g $(XDP_BPF)
 	$(LLC) ${XDP_BPF:.c=.bc} -march=bpf -filetype=obj -o ${XDP_BPF:.c=.bpf.o}
 	rm $(XDP_BPF)
 

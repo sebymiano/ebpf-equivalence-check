@@ -69,6 +69,7 @@ struct bpf_map_def {
 #include <dirent.h>
 #include <sys/types.h> 
 #include <errno.h>
+
 char *reply_test_dir;
 bool replay_mode = false;
 char *json_file_path = NULL;
@@ -360,7 +361,7 @@ static long (*bpf_map_update_elem)(void *map, const void *key,
  * Returns
  * 	0 on success, or a negative error in case of failure.
  */
-#ifdef USES_BPF_MAP_DELETE_ELEM
+#if (defined USES_BPF_MAP_DELETE_ELEM) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) long bpf_map_delete_elem(void *map, const void *key) {
   struct bpf_map_def *map_ptr = ((struct bpf_map_def *)map);
   if (bpf_map_stub_types[map_ptr->map_id] == MapStub)
@@ -397,7 +398,7 @@ static long (*bpf_probe_read)(void *dst, __u32 size, const void *unsafe_ptr) = (
  * 	Current *ktime*.
  */
 
-#ifdef USES_BPF_KTIME_GET_NS
+#if (defined USES_BPF_KTIME_GET_NS) && (defined KLEE_VERIFICATION)
 unsigned long long last_time = 0;
 
 static __attribute__ ((noinline)) void bpf_time_init_stub(void) {
@@ -649,7 +650,7 @@ static long (*bpf_l4_csum_replace)(struct __sk_buff *skb, __u32 offset, __u64 fr
  * Returns
  * 	0 on success, or a negative error in case of failure.
  */
-#ifdef USES_BPF_TAIL_CALL
+#if (defined USES_BPF_TAIL_CALL) && (defined KLEE_VERIFICATION)
 // On success the program ends so just model failure.
 static __attribute__ ((noinline)) long  bpf_tail_call(void *ctx, void *prog_array_map, __u32 index) {
   // TODO: Is there a certain set of meaningful error codes that we should be returning?
@@ -701,7 +702,8 @@ static long (*bpf_clone_redirect)(struct __sk_buff *skb, __u32 ifindex, __u64 fl
  * 	*current_task*\ **->tgid << 32 \|**
  * 	*current_task*\ **->pid**.
  */
-#ifdef USES_BPF_GET_CURRENT_PID_TGID
+#if (defined USES_BPF_GET_CURRENT_PID_TGID) && (defined KLEE_VERIFICATION)
+
 __u64 pid_tgid;
 static __attribute__ ((noinline)) void stub_init_pid_tgid(__u64 pt) {
   pid_tgid = pt;
@@ -1293,7 +1295,7 @@ static __u32 (*bpf_get_hash_recalc)(struct __sk_buff *skb) = (void *) 34;
  * Returns
  * 	A pointer to the current task struct.
  */
-#ifdef USES_BPF_GET_CURRENT_TASK
+#if (defined USES_BPF_GET_CURRENT_TASK) && (defined KLEE_VERIFICATION)
 // We make the harness define the task struct, they know best what they need to read
 // and how to make it symbolic. I don't know that a general symbolic task is feasible.
 
@@ -1553,7 +1555,7 @@ static long (*bpf_probe_read_str)(void *dst, __u32 size, const void *unsafe_ptr)
  * 	A 8-byte long unique number on success, or 0 if the socket
  * 	field is missing inside *skb*.
  */
-#ifdef USES_BPF_GET_SOCKET_COOKIE
+#if (defined USES_BPF_GET_SOCKET_COOKIE) && (defined KLEE_VERIFICATION)
 __u64 socket_cookie;
 static __attribute__ ((noinline)) void stub_init_socket_cookie(__u64 sc) {
   socket_cookie = sc;
@@ -1722,7 +1724,7 @@ static long (*bpf_skb_adjust_room)(struct __sk_buff *skb, __s32 len_diff, __u32 
  */
 
 
-#ifdef USES_BPF_REDIRECT_MAP
+#if (defined USES_BPF_REDIRECT_MAP) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) long bpf_redirect_map (void *map, __u32 key, __u64 flags){
   /* Copy-pasted code from bpf_map_lookup_elem here to avoid nesting calls that must be traced 
      Original code
@@ -3209,7 +3211,7 @@ static long (*bpf_skb_output)(void *ctx, void *map, __u64 flags, void *data, __u
  * Returns
  * 	0 on success, or a negative error in case of failure.
  */
-#ifdef USES_BPF_PROBE_READ_USER
+#if (defined USES_BPF_PROBE_READ_USER) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) long bpf_probe_read_user(void *dst, __u32 size, const void *unsafe_ptr) {
   int i;
 	char* d = dst;
@@ -3232,7 +3234,7 @@ static long (*bpf_probe_read_user)(void *dst, __u32 size, const void *unsafe_ptr
  * Returns
  * 	0 on success, or a negative error in case of failure.
  */
-#ifdef USES_BPF_PROBE_READ_KERNEL
+#if (defined USES_BPF_PROBE_READ_KERNEL) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) long bpf_probe_read_kernel(void *dst, __u32 size, const void *unsafe_ptr) {
   int i;
 	char* d = dst;
@@ -3292,7 +3294,7 @@ static long (*bpf_probe_read_kernel)(void *dst, __u32 size, const void *unsafe_p
  * 	including the trailing NUL character. On error, a negative
  * 	value.
  */
-#ifdef USES_BPF_PROBE_READ_USER_STR
+#if (defined USES_BPF_PROBE_READ_USER_STR) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) long bpf_probe_read_user_str(void *dst, __u32 size, const void *unsafe_ptr) {
   size_t len = strnlen(unsafe_ptr, size);
   if (len == size) {
@@ -3318,7 +3320,7 @@ static long (*bpf_probe_read_user_str)(void *dst, __u32 size, const void *unsafe
  * 	On success, the strictly positive length of the string, including
  * 	the trailing NUL character. On error, a negative value.
  */
-#ifdef USES_BPF_PROBE_READ_KERNEL_STR
+#if (defined USES_BPF_PROBE_READ_KERNEL_STR) && (defined KLEE_VERIFICATION)
 static __attribute__ ((noinline)) long bpf_probe_read_kernel_str(void *dst, __u32 size, const void *unsafe_ptr) {
   size_t len = strnlen(unsafe_ptr, size);
   if (len == size) {
@@ -3524,7 +3526,7 @@ static long (*bpf_sk_assign)(void *ctx, void *sk, __u64 flags) = (void *) 124;
  * Returns
  * 	Current *ktime*.
  */
-#ifdef USES_BPF_KTIME_GET_BOOT_NS
+#if (defined USES_BPF_KTIME_GET_BOOT_NS) && (defined KLEE_VERIFICATION)
 unsigned long long last_boot_time = 0;
 
 static __attribute__ ((noinline)) void bpf_boot_time_init_stub(void) {
@@ -3654,7 +3656,7 @@ static __u64 (*bpf_sk_ancestor_cgroup_id)(void *sk, int ancestor_level) = (void 
  * Returns
  * 	0 on success, or a negative error in case of failure.
  */
-#ifdef USES_BPF_RINGBUF_OUTPUT
+#if (defined USES_BPF_RINGBUF_OUTPUT) && (defined KLEE_VERIFICATION)
 static long bpf_ringbuf_output(void *ringbuf, void *data, __u64 size, __u64 flags) {
   long result;
   klee_make_symbolic(&result, sizeof(long), "ringbuf_output_result");
@@ -3675,7 +3677,7 @@ static long (*bpf_ringbuf_output)(void *ringbuf, void *data, __u64 size, __u64 f
  * 	Valid pointer with *size* bytes of memory available; NULL,
  * 	otherwise.
  */
-#ifdef USES_BPF_RINGBUF_RESERVE
+#if (defined USES_BPF_RINGBUF_RESERVE) && (defined KLEE_VERIFICATION)
 static void* bpf_ringbuf_reserve(void *ringbuf, __u64 size, __u64 flags) {
   assert(flags == 0);
   if (!klee_int("ringbuf_reserves_success")) {
@@ -3703,7 +3705,7 @@ static void *(*bpf_ringbuf_reserve)(void *ringbuf, __u64 size, __u64 flags) = (v
  * Returns
  * 	Nothing. Always succeeds.
  */
-#ifdef USES_BPF_RINGBUF_SUBMIT
+#if (defined USES_BPF_RINGBUF_SUBMIT) && (defined KLEE_VERIFICATION)
 static void bpf_ringbuf_submit(void *ringbuf, __u64 flags) {}
 #else
 static void (*bpf_ringbuf_submit)(void *data, __u64 flags) = (void *) 132;
@@ -3725,7 +3727,7 @@ static void (*bpf_ringbuf_submit)(void *data, __u64 flags) = (void *) 132;
  * Returns
  * 	Nothing. Always succeeds.
  */
-#ifdef USES_BPF_RINGBUF_DISCARD
+#if (defined USES_BPF_RINGBUF_DISCARD) && (defined KLEE_VERIFICATION)
 static void bpf_ringbuf_discard(void *ringbuf, __u64 flags) {}
 #else
 static void (*bpf_ringbuf_discard)(void *data, __u64 flags) = (void *) 133;
@@ -3750,7 +3752,7 @@ static void (*bpf_ringbuf_discard)(void *data, __u64 flags) = (void *) 133;
  * Returns
  * 	Requested value, or 0, if *flags* are not recognized.
  */
-#ifdef USES_BPF_RINGBUF_QUERY
+#if (defined USES_BPF_RINGBUF_QUERY) && (defined KLEE_VERIFICATION)
 static __u64 bpf_ringbuf_query(void *ringbuf, __u64 flags) {
   if (flags == BPF_RB_AVAIL_DATA || flags == BPF_RB_RING_SIZE || flags == BPF_RB_CONS_POS || flags == BPF_RB_PROD_POS) {
     __u64 result;
@@ -4287,7 +4289,7 @@ static long (*bpf_task_storage_delete)(void *map, struct task_struct *task) = (v
  * Returns
  * 	Pointer to the current task.
  */
-#ifdef USES_BPF_GET_CURRENT_TASK_BTF
+#if (defined USES_BPF_GET_CURRENT_TASK_BTF) && (defined KLEE_VERIFICATION)
 // We make the harness define the task struct, they know best what they need to read
 // and how to make it symbolic. I don't know that a general symbolic task is feasible.
 static __attribute__ ((noinline)) struct task_struct *bpf_get_current_task_btf() {

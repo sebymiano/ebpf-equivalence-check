@@ -65,7 +65,7 @@ RUN cd /ebpf-se/deps \
 RUN cd /ebpf-se/deps \
     && git clone https://github.com/klee/klee.git \
     && cd klee \
-    && git checkout v3.0 \
+    && git checkout v3.1 \
     && mkdir -p build \
     && cd build \
     && cmake -DENABLE_UNIT_TESTS=OFF \
@@ -84,7 +84,8 @@ RUN cd /ebpf-se/deps \
         -DLLVMCC="/usr/bin/clang-12" \
         -DLLVMCXX="/usr/bin/clang++-12" \
         .. \
-    && make -j$(nproc)
+    && make -j$(nproc) \
+    && make install
 
 WORKDIR /libjson-c
 
@@ -101,7 +102,8 @@ WORKDIR /ebpf-se
 
 # Set environment variables
 ENV PATH=/ebpf-se/deps/klee/build/bin:$PATH \
-    KLEE_INCLUDE=/ebpf-se/deps/klee/include 
+    KLEE_INCLUDE=/ebpf-se/deps/klee/include \
+    KLEE_LIB=/ebpf-se/deps/klee/build/lib/ 
 
 ADD libbpf-stubbed /ebpf-se/libbpf-stubbed
 

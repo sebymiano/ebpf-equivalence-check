@@ -1,7 +1,7 @@
 #ifndef __BPF_MAP_HELPERS__
 #define __BPF_MAP_HELPERS__
 
-#include "klee/klee.h"
+#include <klee/klee.h>
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
@@ -224,7 +224,8 @@ void *map_lookup_elem(struct MapStub *map, const void *key) {
   strcat(final_sym_name, lookup_num_str);
   strcat(final_sym_name, sym_name);
   strcat(final_sym_name, map->name);
-  int map_has_this_key = klee_int(final_sym_name);
+  int map_has_this_key;
+  klee_make_symbolic(&map_has_this_key, sizeof(map_has_this_key), final_sym_name);
 
   if (map_has_this_key) {
     map->key_deleted[map->keys_seen] = 0;
